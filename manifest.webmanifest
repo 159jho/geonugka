@@ -1,0 +1,18 @@
+{
+  "name": "GEONUGKA | Aja — registro de potreros",
+  "short_name": "GEONUGKA",
+  "description": "Registro georreferenciado de potreros: superficie, perímetro, pastura, raza y carga animal. IGBI – FIZBAC – UNTRM.",
+  "lang": "es-PE",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#12241C",
+  "theme_color": "#12241C",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

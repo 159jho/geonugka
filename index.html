@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GEONUGKA | Aja — versión de campo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#12241C">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GEONUGKA">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"></script>
+<script>
+/* Si el primer CDN no responde, se intenta el segundo antes de seguir. */
+if(!window.maplibregl){
+  document.write('<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">');
+  document.write('<scr'+'ipt src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"><\/scr'+'ipt>');
+}
+</script>
+<style>
+  :root{
+    --surface:#FCFDFB; --surface-2:#F1F5EF; --surface-3:#E4EAE2;
+    --ink:#14201A; --ink-2:#55645B; --ink-3:#7B8A81;
+    --line:#D2DAD1; --line-strong:#B3BFB4;
+    --accent:#0E6C6B; --accent-soft:#D8E8E5;
+    --ok:#2C6E49; --ok-soft:#DCEBE0;
+    --warn:#8A5A07; --warn-soft:#F6E7CA;
+    --crit:#A32B2B; --crit-soft:#F5DCDC;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:14px;color:var(--ink);background:var(--surface);overflow:hidden;}
+  #map{position:absolute;inset:0;}
+
+  .bar{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;gap:.4rem;align-items:center;
+    padding:calc(env(safe-area-inset-top,0px) + .45rem) .6rem .45rem;
+    background:rgba(252,253,251,.95);border-bottom:1px solid var(--line-strong);flex-wrap:wrap;}
+  .brand{font-weight:700;letter-spacing:-.01em;}
+  .brand span{color:var(--ink-3);}
+  .brand em{font-style:normal;font-size:.7rem;background:var(--accent-soft);color:var(--accent);
+    padding:.1rem .3rem;border-radius:2px;margin-left:.25rem;}
+  .grow{flex:1;}
+  select,input,textarea{font:inherit;font-size:.82rem;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line-strong);border-radius:3px;padding:.32rem .4rem;width:100%;}
+  .bar select{width:auto;max-width:11rem;}
+  .gps{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.7rem;color:var(--ink-2);
+    border:1px solid var(--line-strong);border-radius:999px;padding:.15rem .5rem;white-space:nowrap;}
+  .gps.live{color:#fff;background:var(--accent);border-color:var(--accent);}
+
+  .dock{position:absolute;left:0;right:0;bottom:0;z-index:5;background:rgba(252,253,251,.97);
+    border-top:1px solid var(--line-strong);padding:.5rem .6rem calc(env(safe-area-inset-bottom,0px) + .5rem);}
+  .live{display:flex;gap:1rem;align-items:baseline;flex-wrap:wrap;margin-bottom:.45rem;}
+  .live .k{font-family:ui-monospace,monospace;font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);display:block;}
+  .live .v{font-size:1.05rem;font-weight:600;font-variant-numeric:tabular-nums;}
+  .live .msg{flex:1 1 10rem;font-size:.76rem;color:var(--ink-2);min-width:9rem;}
+  .btns{display:flex;gap:.35rem;flex-wrap:wrap;}
+  button{font:inherit;font-size:.82rem;border:1px solid var(--line-strong);background:var(--surface);
+    color:var(--ink);border-radius:3px;padding:.45rem .7rem;cursor:pointer;}
+  button.p{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500;}
+  button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button:disabled{opacity:.45;cursor:not-allowed;}
+
+  .sheet{position:absolute;inset:auto 0 0 0;z-index:9;background:var(--surface);
+    border-top:1px solid var(--line-strong);max-height:88%;overflow-y:auto;
+    padding:.8rem .8rem calc(env(safe-area-inset-bottom,0px) + 1rem);display:none;}
+  .sheet.open{display:block;}
+  .sheet h2{margin:0 0 .6rem;font-size:1rem;}
+  .grp{display:grid;gap:.5rem;margin-bottom:.7rem;}
+  label.f{display:grid;gap:.15rem;font-size:.72rem;color:var(--ink-2);}
+  label.f>span{font-family:ui-monospace,monospace;font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;}
+  .r2{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;}
+  .r3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.45rem;}
+  .cat{display:grid;grid-template-columns:1fr 3.6rem;gap:.25rem .5rem;align-items:center;font-size:.8rem;}
+  .cat input{text-align:right;padding:.22rem .3rem;}
+  .calc{background:var(--surface-3);border:1px solid var(--line);border-radius:3px;padding:.55rem;display:grid;gap:.35rem;margin-bottom:.7rem;}
+  .kv{display:flex;justify-content:space-between;font-size:.82rem;}
+  .kv .v{font-weight:600;font-variant-numeric:tabular-nums;}
+  .st{display:inline-flex;gap:.25rem;align-items:center;font-size:.74rem;font-weight:500;padding:.15rem .4rem;border-radius:3px;}
+  .st.ok{background:var(--ok-soft);color:var(--ok);} .st.warn{background:var(--warn-soft);color:var(--warn);}
+  .st.crit{background:var(--crit-soft);color:var(--crit);} .st.none{background:var(--surface-3);color:var(--ink-3);}
+  .note{border-left:3px solid var(--accent);background:var(--surface-2);padding:.5rem .6rem;font-size:.76rem;color:var(--ink-2);margin-bottom:.7rem;}
+  .pc{border:1px solid var(--line);border-radius:3px;padding:.5rem .6rem;margin-bottom:.45rem;}
+  .pc .nm{font-weight:600;}
+  .pc .mt{font-size:.76rem;color:var(--ink-2);}
+  .maplibregl-ctrl-attrib{font-size:10px;}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="bar">
+  <div class="brand"><span>GEO</span>NUGKA<em>Aja</em></div>
+  <div class="grow"></div>
+  <select id="layer" title="Capa base">
+    <option value="esri">Esri World Imagery</option>
+    <option value="s2">Sentinel-2 cloudless (EOX)</option>
+    <option value="osm">OpenStreetMap</option>
+  </select>
+  <span class="gps" id="netchip" title="Estado de conexión">en línea</span>
+  <span class="gps" id="gpschip">GPS apagado</span>
+  <button id="b-install" hidden style="padding:.25rem .5rem;font-size:.75rem">Instalar</button>
+</div>
+
+<div class="dock">
+  <div class="live">
+    <div><span class="k">Superficie</span><span class="v" id="l-area">—</span></div>
+    <div><span class="k">Perímetro</span><span class="v" id="l-per">—</span></div>
+    <div><span class="k">Vértices</span><span class="v" id="l-ver">—</span></div>
+    <div class="msg" id="l-msg">Activa <b>Dibujar</b> y toca el mapa, o usa <b>Caminar GPS</b> para recorrer el lindero.</div>
+  </div>
+  <div class="btns">
+    <button id="b-draw" aria-pressed="false">Dibujar</button>
+    <button id="b-gps" aria-pressed="false">Caminar GPS</button>
+    <button id="b-mark">Marcar vértice</button>
+    <button id="b-undo">Deshacer</button>
+    <button id="b-close" class="p" disabled>Cerrar y registrar</button>
+    <button id="b-list">Potreros (<span id="n">0</span>)</button>
+    <button id="b-exp">Exportar</button>
+  </div>
+</div>
+
+<!-- Formulario -->
+<div class="sheet" id="sheet">
+  <h2 id="sh-title">Registrar potrero</h2>
+  <div class="calc" id="sh-geo"></div>
+
+  <div class="grp">
+    <div class="r2">
+      <label class="f"><span>Predio</span><input id="f-predio" placeholder="Fundo…"></label>
+      <label class="f"><span>Potrero</span><input id="f-nombre" placeholder="El alto"></label>
+    </div>
+    <label class="f"><span>Productor</span><input id="f-productor"></label>
+    <label class="f"><span>Distrito</span><select id="f-distrito"></select></label>
+    <div class="r2">
+      <label class="f"><span>Superficie útil (ha)</span><input type="number" step="0.01" id="f-util"></label>
+      <label class="f"><span>Estado</span><select id="f-estado">
+        <option>En uso</option><option>En descanso</option><option>En renovación</option><option>Clausurado</option>
+      </select></label>
+    </div>
+  </div>
+
+  <div class="grp">
+    <label class="f"><span>Tipo de pastura</span><select id="f-tipo">
+      <option>Natural</option><option>Natural mejorada</option><option>Cultivada</option>
+      <option>Asociada gramínea + leguminosa</option><option>Silvopastoril</option><option>Cultivo de corte</option>
+    </select></label>
+    <label class="f"><span>Especie principal</span><select id="f-especie"></select></label>
+    <label class="f"><span>Leguminosa asociada</span><select id="f-legum"></select></label>
+    <div class="r3">
+      <label class="f"><span>Cobertura %</span><input type="number" id="f-cob" value="85"></label>
+      <label class="f"><span>kg MS/ha</span><input type="number" id="f-ms" value="2800"></label>
+      <label class="f"><span>Días ocup.</span><input type="number" id="f-ocup" value="4"></label>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div class="r2">
+      <label class="f"><span>Especie animal</span><select id="f-espani">
+        <option value="bovino">Bovino</option><option value="ovino">Ovino</option>
+        <option value="caprino">Caprino</option><option value="equino">Equino</option>
+      </select></label>
+      <label class="f"><span>Raza</span><select id="f-raza"></select></label>
+    </div>
+    <div class="cat" id="cat"></div>
+  </div>
+
+  <div class="calc" id="sh-calc"></div>
+  <label class="f" style="margin-bottom:.7rem"><span>Observaciones</span><textarea id="f-obs" rows="2"></textarea></label>
+
+  <div class="btns">
+    <button class="p" id="b-save" style="flex:1">Guardar</button>
+    <button id="b-cancel">Cancelar</button>
+  </div>
+</div>
+
+<!-- Lista -->
+<div class="sheet" id="listsheet">
+  <h2>Potreros registrados</h2>
+  <div class="note">Se guardan en este navegador (almacenamiento local). Exporta a GeoJSON o KML para llevarlos a QGIS, ArcGIS o Google Earth.</div>
+  <div id="plist"></div>
+  <div class="btns" style="margin-top:.6rem">
+    <button id="b-geojson">Descargar GeoJSON</button>
+    <button id="b-kml">Descargar KML</button>
+    <button id="b-closelist" class="p">Cerrar</button>
+  </div>
+</div>
+
+<script>
+/* ===================================================================
+   GEONUGKA | Aja — versión de campo
+   IGBI – FIZBAC – UNTRM · prototipo, software libre
+   Capas base abiertas / gratuitas para uso académico.
+   =================================================================== */
+(function(){
+"use strict";
+
+/* ---------- la librería del mapa tiene que estar ---------- */
+if(!window.maplibregl){
+  document.getElementById('map').innerHTML =
+    '<div style="padding:5rem 1.5rem 1.5rem;text-align:center;font-size:.9rem;line-height:1.6">'+
+    '<b style="display:block;font-size:1rem;margin-bottom:.4rem">No se pudo cargar la librería del mapa</b>'+
+    'La primera vez que abres la app necesita internet para descargarla. '+
+    'Conéctate y vuelve a cargar esta página; después ya funcionará sin señal.</div>';
+  document.querySelector('.dock').style.display='none';
+  return;
+}
+
+/* ---------- catálogos ---------- */
+const DISTRITOS=[
+ {n:'Molinopampa (Chachapoyas)',piso:'alto'},{n:'Florida – Pomacochas (Bongará)',piso:'alto'},
+ {n:'Leymebamba (Chachapoyas)',piso:'alto'},{n:'Chachapoyas',piso:'alto'},{n:'Soloco (Chachapoyas)',piso:'alto'},
+ {n:'Jamalca (Utcubamba)',piso:'bajo'},{n:'Bagua Grande (Utcubamba)',piso:'bajo'},
+ {n:'Cajaruro (Utcubamba)',piso:'bajo'},{n:'La Peca (Bagua)',piso:'bajo'},{n:'Nieva (Condorcanqui)',piso:'bajo'}];
+const ESPECIES={
+ alto:['Rye grass inglés (Lolium perenne)','Rye grass italiano (Lolium multiflorum)','Pasto ovillo (Dactylis glomerata)',
+       'Trébol blanco (Trifolium repens)','Kikuyo (Cenchrus clandestinus)','Avena forrajera (Avena sativa)',
+       'Pasto natural de jalca','Asociación rye grass + trébol'],
+ bajo:['Brachiaria brizantha cv. Marandú','Brachiaria brizantha cv. Toledo','Brachiaria decumbens','Brachiaria humidicola',
+       'Guinea (Panicum maximum)','Mombasa (Panicum maximum)','King grass (Pennisetum purpureum)',
+       'Maralfalfa (Pennisetum purpureum)','Gramalote (Axonopus scoparius)','Nudillo (Paspalum spp.)']};
+const LEGUM=['Ninguna','Arachis pintoi','Centrosema macrocarpum','Desmodium ovalifolium','Stylosanthes guianensis','Leucaena leucocephala','Erythrina spp.'];
+const RAZAS={bovino:{alto:['Brown Swiss','Holstein','Jersey','Fleckvieh','Criollo','Cruce Brown Swiss × Criollo'],
+                    bajo:['Gyr','Girolando','Brahman','Nelore','Brown Swiss','Criollo','Cruce Cebú × Criollo']},
+             ovino:{alto:['Corriedale','Hampshire Down','Criollo'],bajo:['Blackbelly','Dorper','Criollo']},
+             caprino:{alto:['Criollo','Saanen'],bajo:['Criollo','Anglo-nubian','Saanen']},
+             equino:{alto:['Criollo','Peruano de paso'],bajo:['Criollo','Peruano de paso']}};
+const CATS=[{k:'vacaProd',n:'Vaca en producción',ua:1.00},{k:'vacaSeca',n:'Vaca seca',ua:0.90},
+ {k:'vaquillona',n:'Vaquillona',ua:0.75},{k:'vaquilla',n:'Vaquilla',ua:0.60},
+ {k:'ternero',n:'Ternero / ternera',ua:0.30},{k:'toro',n:'Toro',ua:1.25},{k:'torete',n:'Torete',ua:0.80}];
+const CONSUMO_UA=13.5, UTILIZACION=0.55;
+
+/* ---------- geodesia (idéntica a Turf.js) ---------- */
+const R=6371008.8, rad=d=>d*Math.PI/180;
+function areaM2(ring){ // ring: [[lon,lat],...]
+  if(ring.length<3) return 0;
+  let t=0;
+  for(let i=0;i<ring.length;i++){
+    const a=ring[i], b=ring[(i+1)%ring.length];
+    t += rad(b[0]-a[0])*(2+Math.sin(rad(a[1]))+Math.sin(rad(b[1])));
+  }
+  return Math.abs(t*R*R/2);
+}
+function dist(a,b){
+  const dLat=rad(b[1]-a[1]), dLon=rad(b[0]-a[0]);
+  const s=Math.sin(dLat/2)**2+Math.cos(rad(a[1]))*Math.cos(rad(b[1]))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(s)));
+}
+function perim(ring,closed){
+  let t=0; for(let i=0;i<ring.length-1;i++) t+=dist(ring[i],ring[i+1]);
+  if(closed&&ring.length>2) t+=dist(ring[ring.length-1],ring[0]);
+  return t;
+}
+function cen(ring){ let x=0,y=0; ring.forEach(p=>{x+=p[0];y+=p[1];}); return [x/ring.length,y/ring.length]; }
+function utm(lon,lat){
+  const zone=Math.floor((lon+180)/6)+1, k0=0.9996, a=6378137, e2=0.00669438;
+  const lon0=rad((zone-1)*6-180+3), f=rad(lat), l=rad(lon);
+  const N=a/Math.sqrt(1-e2*Math.sin(f)**2), T=Math.tan(f)**2, C=(e2/(1-e2))*Math.cos(f)**2, A=(l-lon0)*Math.cos(f);
+  const e4=e2*e2,e6=e4*e2;
+  const M=a*((1-e2/4-3*e4/64-5*e6/256)*f-(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*f)
+    +(15*e4/256+45*e6/1024)*Math.sin(4*f)-(35*e6/3072)*Math.sin(6*f));
+  const E=k0*N*(A+(1-T+C)*A**3/6)+500000;
+  let Nn=k0*(M+N*Math.tan(f)*(A*A/2+(5-T+9*C+4*C*C)*A**4/24));
+  if(lat<0) Nn+=1e7;
+  return zone+(lat<0?'S':'N')+' · '+Math.round(E)+' E · '+Math.round(Nn)+' N';
+}
+const fmt=(v,d=1)=>Number(v).toLocaleString('es-PE',{minimumFractionDigits:d,maximumFractionDigits:d});
+
+/* ---------- mapa ---------- */
+const SOURCES={
+  esri:{tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        attr:'Imagery © Esri, Maxar, Earthstar Geographics'},
+  s2:{tiles:['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg'],
+      attr:'Sentinel-2 cloudless 2020 by EOX (CC BY-NC-SA 4.0) · Copernicus'},
+  osm:{tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+       attr:'© OpenStreetMap contributors (ODbL)'}
+};
+function styleFor(k){
+  return {version:8, sources:{base:{type:'raster',tiles:SOURCES[k].tiles,tileSize:256,attribution:SOURCES[k].attr}},
+          layers:[{id:'base',type:'raster',source:'base'}]};
+}
+const map = new maplibregl.Map({
+  container:'map', style:styleFor('esri'),
+  center:[-77.6540,-6.2790], zoom:15, maxZoom:20, attributionControl:{compact:true}
+});
+map.addControl(new maplibregl.NavigationControl({showCompass:true}),'top-right');
+map.addControl(new maplibregl.ScaleControl({maxWidth:110,unit:'metric'}),'bottom-left');
+
+const EMPTY={type:'FeatureCollection',features:[]};
+map.on('load',()=>{
+  map.addSource('saved',{type:'geojson',data:EMPTY});
+  map.addLayer({id:'saved-f',type:'fill',source:'saved',paint:{'fill-color':'#FFD600','fill-opacity':0.16}});
+  map.addLayer({id:'saved-l',type:'line',source:'saved',paint:{'line-color':'#FFD600','line-width':2}});
+  map.addLayer({id:'saved-t',type:'symbol',source:'saved',
+    layout:{'text-field':['concat',['get','nombre'],' · ',['to-string',['round',['*',['get','superficie_ha'],100]]]],
+            'text-size':11,'text-offset':[0,0]},
+    paint:{'text-color':'#fff','text-halo-color':'#14201A','text-halo-width':1.6}});
+
+  map.addSource('draft',{type:'geojson',data:EMPTY});
+  map.addLayer({id:'draft-f',type:'fill',source:'draft',filter:['==','$type','Polygon'],
+    paint:{'fill-color':'#00E5FF','fill-opacity':0.18}});
+  map.addLayer({id:'draft-l',type:'line',source:'draft',
+    paint:{'line-color':'#00E5FF','line-width':2.4,'line-dasharray':[2,1]}});
+  map.addLayer({id:'draft-p',type:'circle',source:'draft',filter:['==','$type','Point'],
+    paint:{'circle-radius':4.5,'circle-color':'#00E5FF','circle-stroke-color':'#fff','circle-stroke-width':1.6}});
+  refreshSaved();
+});
+document.getElementById('layer').onchange=e=>{
+  const k=e.target.value;
+  map.setStyle(styleFor(k));
+  map.once('styledata',()=>{ setTimeout(()=>{ if(!map.getSource('saved')) location.reload(); },50); });
+  map.once('idle',()=>{ if(!map.getSource('saved')){ map.fire('load'); } });
+};
+// recrear capas al cambiar de estilo
+map.on('styledata',()=>{
+  if(map.isStyleLoaded() && !map.getSource('saved')){
+    map.addSource('saved',{type:'geojson',data:EMPTY});
+    map.addLayer({id:'saved-f',type:'fill',source:'saved',paint:{'fill-color':'#FFD600','fill-opacity':0.16}});
+    map.addLayer({id:'saved-l',type:'line',source:'saved',paint:{'line-color':'#FFD600','line-width':2}});
+    map.addSource('draft',{type:'geojson',data:EMPTY});
+    map.addLayer({id:'draft-f',type:'fill',source:'draft',filter:['==','$type','Polygon'],paint:{'fill-color':'#00E5FF','fill-opacity':0.18}});
+    map.addLayer({id:'draft-l',type:'line',source:'draft',paint:{'line-color':'#00E5FF','line-width':2.4}});
+    map.addLayer({id:'draft-p',type:'circle',source:'draft',filter:['==','$type','Point'],
+      paint:{'circle-radius':4.5,'circle-color':'#00E5FF','circle-stroke-color':'#fff','circle-stroke-width':1.6}});
+    refreshSaved(); refreshDraft();
+  }
+});
+
+/* ---------- estado ---------- */
+const $=id=>document.getElementById(id);
+let draft=[], drawing=false, watching=null, lastPos=null, acc=null, metodo='', editId=null;
+let potreros=[];
+try{ potreros=JSON.parse(localStorage.getItem('geonugka_potreros')||'[]'); }catch(e){ potreros=[]; }
+const save=()=>{ try{ localStorage.setItem('geonugka_potreros',JSON.stringify(potreros)); }catch(e){} };
+
+function refreshDraft(){
+  const feats=[];
+  if(draft.length>2) feats.push({type:'Feature',geometry:{type:'Polygon',coordinates:[draft.concat([draft[0]])]},properties:{}});
+  else if(draft.length>1) feats.push({type:'Feature',geometry:{type:'LineString',coordinates:draft},properties:{}});
+  draft.forEach(c=>feats.push({type:'Feature',geometry:{type:'Point',coordinates:c},properties:{}}));
+  const s=map.getSource('draft'); if(s) s.setData({type:'FeatureCollection',features:feats});
+  const a=draft.length>2?areaM2(draft):0, p=perim(draft,draft.length>2);
+  $('l-area').textContent = a? fmt(a/10000,2)+' ha':'—';
+  $('l-per').textContent = p? fmt(p,0)+' m':'—';
+  $('l-ver').textContent = draft.length||'—';
+  $('b-close').disabled = draft.length<3;
+  if(draft.length>=3 && acc!=null)
+    $('l-msg').innerHTML='Incertidumbre estimada <b>±'+fmt(p*acc/2/10000,2)+' ha</b> con ±'+fmt(acc,1)+' m de GPS.';
+}
+function refreshSaved(){
+  const s=map.getSource('saved'); if(!s) return;
+  s.setData({type:'FeatureCollection',features:potreros.map(toFeature)});
+  $('n').textContent=potreros.length;
+}
+
+/* ---------- dibujar ---------- */
+$('b-draw').onclick=()=>{
+  drawing=!drawing;
+  $('b-draw').setAttribute('aria-pressed',String(drawing));
+  map.getCanvas().style.cursor = drawing?'crosshair':'';
+  $('l-msg').textContent = drawing?'Toca el mapa para colocar cada vértice del lindero.':'';
+};
+map.on('click',e=>{
+  if(!drawing) return;
+  draft.push([+e.lngLat.lng.toFixed(7), +e.lngLat.lat.toFixed(7)]);
+  metodo='Digitalización sobre imagen';
+  refreshDraft();
+});
+$('b-undo').onclick=()=>{ draft.pop(); refreshDraft(); };
+
+/* ---------- GPS ---------- */
+$('b-gps').onclick=()=>{
+  if(watching!=null){ stopGPS(); return; }
+  if(!navigator.geolocation){ alert('Este navegador no expone la ubicación.'); return; }
+  $('gpschip').textContent='buscando señal…';
+  watching = navigator.geolocation.watchPosition(pos=>{
+    lastPos=[+pos.coords.longitude.toFixed(7), +pos.coords.latitude.toFixed(7)];
+    acc = pos.coords.accuracy;
+    $('gpschip').textContent='GPS ±'+fmt(acc,1)+' m';
+    $('gpschip').classList.add('live');
+    if(!map.__centered){ map.jumpTo({center:lastPos,zoom:18}); map.__centered=true; }
+    if(autoTrack && acc<=accLimit){
+      const last=draft[draft.length-1];
+      if(!last || dist(last,lastPos)>=3){ draft.push(lastPos); metodo='Caminata perimetral con GNSS'; refreshDraft(); }
+    }
+  }, err=>{
+    $('gpschip').textContent='GPS no disponible';
+    alert('No se pudo leer la ubicación ('+err.message+').\n\nEn Chrome la geolocalización suele exigir HTTPS: sirve este archivo con "python3 -m http.server" y ábrelo por http://localhost:8000, o publícalo en un servidor con certificado.');
+    stopGPS();
+  }, {enableHighAccuracy:true, maximumAge:1000, timeout:20000});
+  autoTrack=true;
+  $('b-gps').setAttribute('aria-pressed','true');
+  $('l-msg').innerHTML='<b>Caminando el perímetro.</b> Se guarda un punto cada 3 m descartando lecturas peores que ±'+accLimit+' m.';
+};
+let autoTrack=false; const accLimit=15;
+function stopGPS(){
+  if(watching!=null) navigator.geolocation.clearWatch(watching);
+  watching=null; autoTrack=false;
+  $('b-gps').setAttribute('aria-pressed','false');
+  $('gpschip').classList.remove('live');
+  $('gpschip').textContent='GPS apagado';
+}
+$('b-mark').onclick=()=>{
+  if(!lastPos){ alert('Activa primero el GPS para marcar un vértice en tu posición.'); return; }
+  draft.push(lastPos.slice()); metodo=metodo||'Vértices con GNSS'; refreshDraft();
+};
+
+/* ---------- formulario ---------- */
+(function init(){
+  const d=$('f-distrito'); DISTRITOS.forEach((x,i)=>d.add(new Option(x.n,i)));
+  d.onchange=()=>{ fillEsp(); fillRaza(); calc(); };
+  LEGUM.forEach(x=>$('f-legum').add(new Option(x,x)));
+  $('cat').innerHTML = CATS.map(c=>'<label for="c-'+c.k+'">'+c.n+' <small style="color:var(--ink-3)">'+c.ua.toFixed(2)+' UA</small></label>'+
+    '<input type="number" min="0" id="c-'+c.k+'" value="0">').join('');
+  $('cat').addEventListener('input',calc);
+  $('f-espani').onchange=()=>{ fillRaza(); };
+  ['f-ms','f-util','f-ocup'].forEach(id=>$(id).addEventListener('input',calc));
+  fillEsp(); fillRaza();
+})();
+function fillEsp(){ const p=DISTRITOS[$('f-distrito').value].piso, s=$('f-especie'); s.innerHTML=''; ESPECIES[p].forEach(x=>s.add(new Option(x,x))); }
+function fillRaza(){ const p=DISTRITOS[$('f-distrito').value].piso, s=$('f-raza'); s.innerHTML=''; (RAZAS[$('f-espani').value][p]||[]).forEach(x=>s.add(new Option(x,x))); }
+
+function balance(ua,dias,ocup){
+  if(!ua) return {c:'none',i:'○',t:'Sin ganado'};
+  if(dias<ocup) return {c:'crit',i:'■',t:'Sobrecarga'};
+  if(dias<ocup*1.3) return {c:'warn',i:'▲',t:'Ajustado'};
+  return {c:'ok',i:'✓',t:'Adecuado'};
+}
+function calc(){
+  let ua=0; CATS.forEach(c=>ua+=(parseFloat($('c-'+c.k).value)||0)*c.ua);
+  const util=parseFloat($('f-util').value)||0, ms=parseFloat($('f-ms').value)||0, ocup=parseFloat($('f-ocup').value)||1;
+  const carga=util>0?ua/util:0, oferta=ms*util*UTILIZACION, dias=ua>0?oferta/(ua*CONSUMO_UA):Infinity;
+  const b=balance(ua,dias,ocup);
+  $('sh-calc').innerHTML =
+    kv('Unidades animal',fmt(ua,1)+' UA')+kv('Carga animal',util>0?fmt(carga,2)+' UA/ha':'—')+
+    kv('Oferta forrajera',fmt(oferta,0)+' kg MS')+kv('Días de pastoreo',ua>0?fmt(dias,1)+' días':'—')+
+    '<div class="kv"><span>Balance</span><span class="st '+b.c+'">'+b.i+' '+b.t+'</span></div>'+
+    '<div style="font-family:ui-monospace,monospace;font-size:.64rem;color:var(--ink-3);line-height:1.4">1 UA = bovino de 450 kg · consumo 13,5 kg MS/día · utilización 55 %</div>';
+  return {ua,carga,oferta,dias,b};
+}
+const kv=(k,v)=>'<div class="kv"><span>'+k+'</span><span class="v">'+v+'</span></div>';
+
+$('b-close').onclick=()=>{
+  if(draft.length<3) return;
+  drawing=false; $('b-draw').setAttribute('aria-pressed','false'); map.getCanvas().style.cursor='';
+  stopGPS();
+  const a=areaM2(draft)/10000, p=perim(draft,true), c=cen(draft);
+  $('sh-geo').innerHTML =
+    kv('Superficie geodésica', fmt(a,3)+' ha'+(acc?' <small style="font-weight:400">± '+fmt(p*acc/2/10000,2)+'</small>':''))+
+    kv('Perímetro', fmt(p,1)+' m')+ kv('Vértices', draft.length)+
+    '<div class="kv"><span>Centroide</span><span class="v" style="font-family:ui-monospace,monospace;font-size:.72rem">'+c[1].toFixed(5)+', '+c[0].toFixed(5)+'</span></div>'+
+    '<div class="kv"><span>UTM</span><span class="v" style="font-family:ui-monospace,monospace;font-size:.72rem">'+utm(c[0],c[1])+'</span></div>'+
+    '<div style="font-family:ui-monospace,monospace;font-size:.64rem;color:var(--ink-3);line-height:1.4">Área sobre el elipsoide WGS84, no proyectada. Método: '+(metodo||'manual')+'</div>';
+  $('f-util').value=(a*0.95).toFixed(2);
+  calc();
+  $('sheet').classList.add('open');
+};
+$('b-cancel').onclick=()=>{ $('sheet').classList.remove('open'); };
+
+$('b-save').onclick=()=>{
+  const a=areaM2(draft)/10000, p=perim(draft,true), m=calc();
+  const cats={}; CATS.forEach(c=>cats[c.k]=parseFloat($('c-'+c.k).value)||0);
+  const dist_=DISTRITOS[$('f-distrito').value];
+  const rec={
+    id: editId || ('P-'+String(potreros.length+1).padStart(2,'0')),
+    nombre:$('f-nombre').value.trim()||('Potrero '+(potreros.length+1)),
+    ring:draft.slice(), superficie_ha:+a.toFixed(4), perimetro_m:+p.toFixed(1),
+    precision_m: acc!=null?+acc.toFixed(2):null, metodo:metodo||'manual',
+    predio:$('f-predio').value.trim(), productor:$('f-productor').value.trim(),
+    distrito:dist_.n, piso:dist_.piso, estado:$('f-estado').value,
+    superficie_util_ha:parseFloat($('f-util').value)||a,
+    tipo_pastura:$('f-tipo').value, especie:$('f-especie').value, leguminosa:$('f-legum').value,
+    cobertura_pct:+$('f-cob').value, ms_kg_ha:+$('f-ms').value, dias_ocupacion:+$('f-ocup').value,
+    especie_animal:$('f-espani').value, raza:$('f-raza').value, cabezas:cats,
+    unidades_animal:+m.ua.toFixed(2), carga_animal_ua_ha:+m.carga.toFixed(3),
+    dias_pastoreo: isFinite(m.dias)?+m.dias.toFixed(1):null, balance:m.b.t,
+    observaciones:$('f-obs').value.trim(), fecha:new Date().toISOString()
+  };
+  if(editId){ potreros[potreros.findIndex(x=>x.id===editId)]=rec; editId=null; }
+  else potreros.push(rec);
+  save(); refreshSaved();
+  draft=[]; acc=null; metodo=''; refreshDraft();
+  $('sheet').classList.remove('open');
+  ['f-nombre','f-obs'].forEach(id=>$(id).value='');
+  CATS.forEach(c=>$('c-'+c.k).value=0);
+  $('l-msg').textContent='Guardado: '+rec.nombre+' · '+fmt(rec.superficie_ha,2)+' ha';
+};
+
+/* ---------- lista y exportación ---------- */
+$('b-list').onclick=()=>{ renderList(); $('listsheet').classList.add('open'); };
+$('b-closelist').onclick=()=>$('listsheet').classList.remove('open');
+$('b-exp').onclick=()=>{ renderList(); $('listsheet').classList.add('open'); };
+function renderList(){
+  $('plist').innerHTML = potreros.length? potreros.map(p=>
+    '<div class="pc"><div class="nm">'+p.id+' · '+esc(p.nombre)+'</div>'+
+    '<div class="mt">'+fmt(p.superficie_ha,2)+' ha · '+fmt(p.perimetro_m,0)+' m · '+fmt(p.carga_animal_ua_ha,2)+' UA/ha · '+esc(p.balance)+'</div>'+
+    '<div class="mt">'+esc(p.especie)+' · '+esc(p.raza)+'</div>'+
+    '<div class="btns" style="margin-top:.35rem"><button data-z="'+p.id+'">Ver</button><button data-x="'+p.id+'">Eliminar</button></div></div>'
+  ).join('') : '<div class="mt" style="color:var(--ink-2)">Todavía no hay potreros registrados.</div>';
+  $('plist').querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{
+    const p=potreros.find(x=>x.id===b.dataset.z);
+    const bb=p.ring.reduce((a,c)=>[[Math.min(a[0][0],c[0]),Math.min(a[0][1],c[1])],[Math.max(a[1][0],c[0]),Math.max(a[1][1],c[1])]],
+      [[180,90],[-180,-90]]);
+    map.fitBounds(bb,{padding:60}); $('listsheet').classList.remove('open');
+  });
+  $('plist').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{
+    if(!confirm('¿Eliminar este potrero? No se puede deshacer.')) return;
+    potreros=potreros.filter(x=>x.id!==b.dataset.x); save(); refreshSaved(); renderList();
+  });
+}
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function toFeature(p){
+  const ring=p.ring.concat([p.ring[0]]);
+  const {ring:_,...props}=p;
+  return {type:'Feature',geometry:{type:'Polygon',coordinates:[ring]},properties:props};
+}
+function download(name, text, mime){
+  const b=new Blob([text],{type:mime||'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(b); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+$('b-geojson').onclick=()=>{
+  download('geonugka_potreros.geojson', JSON.stringify({
+    type:'FeatureCollection', name:'GEONUGKA_Aja_potreros',
+    crs:{type:'name',properties:{name:'urn:ogc:def:crs:OGC:1.3:CRS84'}},
+    features:potreros.map(toFeature)},null,2));
+};
+$('b-kml').onclick=()=>{
+  const k='<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>GEONUGKA Aja</name>'+
+    '<Style id="s"><LineStyle><color>ff00d6ff</color><width>2</width></LineStyle>'+
+    '<PolyStyle><color>2600d6ff</color></PolyStyle></Style>'+
+    potreros.map(p=>'<Placemark><name>'+esc(p.nombre)+'</name><styleUrl>#s</styleUrl>'+
+      '<description>'+esc(fmt(p.superficie_ha,2)+' ha · '+fmt(p.carga_animal_ua_ha,2)+' UA/ha · '+p.especie)+'</description>'+
+      '<Polygon><outerBoundaryIs><LinearRing><coordinates>'+
+      p.ring.concat([p.ring[0]]).map(c=>c[0]+','+c[1]+',0').join(' ')+
+      '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>').join('')+
+    '</Document></kml>';
+  download('geonugka_potreros.kml', k, 'application/vnd.google-earth.kml+xml');
+};
+
+refreshDraft();
+})();
+</script>
+
+<script>
+/* Instalación, conexión y service worker: bloque aparte a propósito, para que
+   un fallo del mapa no impida que la app se instale ni que cachee sus archivos. */
+(function(){
+  const g = id => document.getElementById(id);
+  function net(){
+    const c = g('netchip'); if(!c) return;
+    if(navigator.onLine){ c.textContent='en línea'; c.classList.remove('live'); }
+    else { c.textContent='sin conexión'; c.classList.add('live'); }
+  }
+  window.addEventListener('online', net);
+  window.addEventListener('offline', net);
+  net();
+
+  let deferred = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault(); deferred = e; g('b-install').hidden = false;
+  });
+  g('b-install').onclick = async () => {
+    if(!deferred){
+      alert('Para instalarla:\n\nAndroid (Chrome): menú de tres puntos → "Añadir a pantalla de inicio".\n\niPhone (Safari): botón Compartir → "Añadir a pantalla de inicio".');
+      return;
+    }
+    deferred.prompt(); await deferred.userChoice; deferred = null; g('b-install').hidden = true;
+  };
+  window.addEventListener('appinstalled', () => { g('b-install').hidden = true; });
+
+  if('serviceWorker' in navigator && location.protocol !== 'file:'){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .catch(err => console.warn('Service worker no registrado:', err));
+    });
+  }
+})();
+</script>
+</body>
+</html>
