@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>GEONUGKA | Aja — versión de campo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>GEONUGKA | Aja</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#12241C">
 <meta name="mobile-web-app-capable" content="yes">
@@ -15,199 +15,429 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.js"></script>
 <script>
-/* Si el primer CDN no responde, se intenta el segundo antes de seguir. */
 if(!window.maplibregl){
   document.write('<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">');
   document.write('<scr'+'ipt src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"><\/scr'+'ipt>');
 }
 </script>
 <style>
-  :root{
-    --surface:#FCFDFB; --surface-2:#F1F5EF; --surface-3:#E4EAE2;
-    --ink:#14201A; --ink-2:#55645B; --ink-3:#7B8A81;
-    --line:#D2DAD1; --line-strong:#B3BFB4;
-    --accent:#0E6C6B; --accent-soft:#D8E8E5;
-    --ok:#2C6E49; --ok-soft:#DCEBE0;
-    --warn:#8A5A07; --warn-soft:#F6E7CA;
-    --crit:#A32B2B; --crit-soft:#F5DCDC;
-  }
-  *{box-sizing:border-box;}
-  html,body{height:100%;margin:0;}
-  body{font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    font-size:14px;color:var(--ink);background:var(--surface);overflow:hidden;}
-  #map{position:absolute;inset:0;}
+:root{
+  --bg:#FFFFFF; --bg-2:#F2F5F0; --bg-3:#E6EBE3;
+  --ink:#131D18; --ink-2:#4E5C54; --ink-3:#77857C;
+  --line:#CFD8CE; --line-2:#AEBBAF;
+  --accent:#0C6B63; --accent-ink:#FFFFFF; --accent-soft:#D7EAE6;
+  --ok:#256B42; --ok-soft:#D9EADF;
+  --warn:#7E5206; --warn-soft:#F6E6C6;
+  --crit:#9E2222; --crit-soft:#F6DADA;
+  --rec:#C01B4E;
+  --sheet-shadow:0 -6px 28px rgba(9,18,14,.22);
+  --tap:48px;            /* objetivo táctil mínimo */
+  --tap-lg:58px;         /* acción principal */
+  --dock-h:150px;        /* lo actualiza el JS */
+  --r:10px;
+}
+/* Modo alto contraste: para leer la pantalla bajo el sol */
+:root[data-sol="1"]{
+  --bg:#FFFFFF; --bg-2:#FFFFFF; --bg-3:#EDEDED;
+  --ink:#000000; --ink-2:#1A1A1A; --ink-3:#333333;
+  --line:#000000; --line-2:#000000;
+  --accent:#00443F; --accent-soft:#BFE3DE;
+  --sheet-shadow:0 -6px 28px rgba(0,0,0,.5);
+}
 
-  .bar{position:absolute;top:0;left:0;right:0;z-index:5;display:flex;gap:.4rem;align-items:center;
-    padding:calc(env(safe-area-inset-top,0px) + .45rem) .6rem .45rem;
-    background:rgba(252,253,251,.95);border-bottom:1px solid var(--line-strong);flex-wrap:wrap;}
-  .brand{font-weight:700;letter-spacing:-.01em;}
-  .brand span{color:var(--ink-3);}
-  .brand em{font-style:normal;font-size:.7rem;background:var(--accent-soft);color:var(--accent);
-    padding:.1rem .3rem;border-radius:2px;margin-left:.25rem;}
-  .grow{flex:1;}
-  select,input,textarea{font:inherit;font-size:.82rem;color:var(--ink);background:var(--surface-2);
-    border:1px solid var(--line-strong);border-radius:3px;padding:.32rem .4rem;width:100%;}
-  .bar select{width:auto;max-width:11rem;}
-  .gps{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.7rem;color:var(--ink-2);
-    border:1px solid var(--line-strong);border-radius:999px;padding:.15rem .5rem;white-space:nowrap;}
-  .gps.live{color:#fff;background:var(--accent);border-color:var(--accent);}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+/* imprescindible: display:flex/grid en las clases gana sobre el atributo hidden */
+[hidden]{display:none!important;}
+html,body{height:100%;margin:0;overscroll-behavior:none;}
+body{
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:15px; line-height:1.45; color:var(--ink); background:#12241C;
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+}
+#map{position:absolute;inset:0;}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
 
-  .dock{position:absolute;left:0;right:0;bottom:0;z-index:5;background:rgba(252,253,251,.97);
-    border-top:1px solid var(--line-strong);padding:.5rem .6rem calc(env(safe-area-inset-bottom,0px) + .5rem);}
-  .live{display:flex;gap:1rem;align-items:baseline;flex-wrap:wrap;margin-bottom:.45rem;}
-  .live .k{font-family:ui-monospace,monospace;font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);display:block;}
-  .live .v{font-size:1.05rem;font-weight:600;font-variant-numeric:tabular-nums;}
-  .live .msg{flex:1 1 10rem;font-size:.76rem;color:var(--ink-2);min-width:9rem;}
-  .btns{display:flex;gap:.35rem;flex-wrap:wrap;}
-  button{font:inherit;font-size:.82rem;border:1px solid var(--line-strong);background:var(--surface);
-    color:var(--ink);border-radius:3px;padding:.45rem .7rem;cursor:pointer;}
-  button.p{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500;}
-  button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;}
-  button:disabled{opacity:.45;cursor:not-allowed;}
+/* ---------------- barra de estado ---------------- */
+.status{
+  position:absolute;z-index:6;left:0;right:0;
+  top:0;padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 8px;
+  display:flex;gap:8px;align-items:center;pointer-events:none;
+}
+.status > *{pointer-events:auto;}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 12px;
+  background:var(--bg);border:1px solid var(--line);border-radius:999px;
+  font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(9,18,14,.25);
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.pill.gps-off{color:var(--ink-3);}
+.pill.gps-bad{background:var(--crit-soft);border-color:var(--crit);color:var(--crit);}
+.pill.gps-mid{background:var(--warn-soft);border-color:var(--warn);color:var(--warn);}
+.pill.gps-ok{background:var(--ok-soft);border-color:var(--ok);color:var(--ok);}
+.pill.off{background:var(--warn-soft);border-color:var(--warn);color:var(--warn);}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none;}
+.grow{flex:1;}
+.pill.sel{position:relative;padding-right:8px;flex:none;}
+.pill.sel select{
+  font:inherit;font-size:13px;font-weight:600;color:inherit;background:transparent;
+  border:0;padding:0 2px 0 0;max-width:6.4rem;
+}
+#netchip,#gpschip{flex:none;}
+.brand{
+  font-weight:800;letter-spacing:-.02em;font-size:15px;color:#fff;
+  text-shadow:0 1px 6px rgba(0,0,0,.85);align-self:center;
+  white-space:nowrap;min-width:0;overflow:hidden;
+}
+.brand i{font-style:normal;opacity:.7;}
+@media (max-width:480px){ .brand{display:none;} }
 
-  .sheet{position:absolute;inset:auto 0 0 0;z-index:9;background:var(--surface);
-    border-top:1px solid var(--line-strong);max-height:88%;overflow-y:auto;
-    padding:.8rem .8rem calc(env(safe-area-inset-bottom,0px) + 1rem);display:none;}
-  .sheet.open{display:block;}
-  .sheet h2{margin:0 0 .6rem;font-size:1rem;}
-  .grp{display:grid;gap:.5rem;margin-bottom:.7rem;}
-  label.f{display:grid;gap:.15rem;font-size:.72rem;color:var(--ink-2);}
-  label.f>span{font-family:ui-monospace,monospace;font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;}
-  .r2{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;}
-  .r3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.45rem;}
-  .cat{display:grid;grid-template-columns:1fr 3.6rem;gap:.25rem .5rem;align-items:center;font-size:.8rem;}
-  .cat input{text-align:right;padding:.22rem .3rem;}
-  .calc{background:var(--surface-3);border:1px solid var(--line);border-radius:3px;padding:.55rem;display:grid;gap:.35rem;margin-bottom:.7rem;}
-  .kv{display:flex;justify-content:space-between;font-size:.82rem;}
-  .kv .v{font-weight:600;font-variant-numeric:tabular-nums;}
-  .st{display:inline-flex;gap:.25rem;align-items:center;font-size:.74rem;font-weight:500;padding:.15rem .4rem;border-radius:3px;}
-  .st.ok{background:var(--ok-soft);color:var(--ok);} .st.warn{background:var(--warn-soft);color:var(--warn);}
-  .st.crit{background:var(--crit-soft);color:var(--crit);} .st.none{background:var(--surface-3);color:var(--ink-3);}
-  .note{border-left:3px solid var(--accent);background:var(--surface-2);padding:.5rem .6rem;font-size:.76rem;color:var(--ink-2);margin-bottom:.7rem;}
-  .pc{border:1px solid var(--line);border-radius:3px;padding:.5rem .6rem;margin-bottom:.45rem;}
-  .pc .nm{font-weight:600;}
-  .pc .mt{font-size:.76rem;color:var(--ink-2);}
-  .maplibregl-ctrl-attrib{font-size:10px;}
+/* ---------------- botones flotantes ---------------- */
+.fabs{
+  position:absolute;z-index:6;right:10px;
+  bottom:calc(var(--dock-h) + 10px);
+  display:flex;flex-direction:column;gap:8px;
+}
+.fab{
+  width:var(--tap);height:var(--tap);border-radius:50%;
+  background:var(--bg);border:1px solid var(--line);
+  display:grid;place-items:center;box-shadow:0 2px 10px rgba(9,18,14,.3);
+}
+.fab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.fab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+
+/* ---------------- dock inferior ---------------- */
+.dock{
+  position:absolute;z-index:7;left:0;right:0;bottom:0;
+  background:var(--bg);border-top:1px solid var(--line);
+  padding:10px 10px calc(env(safe-area-inset-bottom,0px) + 10px);
+  display:flex;flex-direction:column;gap:9px;
+  box-shadow:0 -2px 14px rgba(9,18,14,.18);
+}
+.metrics{display:flex;gap:6px;}
+.metric{
+  flex:1;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r);
+  padding:7px 9px;min-width:0;
+}
+.metric .k{
+  font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-3);display:block;
+}
+.metric .v{
+  font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;
+  line-height:1.15;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.metric .v small{font-size:12px;font-weight:500;color:var(--ink-2);}
+.metric.rec{border-color:var(--rec);background:var(--crit-soft);}
+
+.hint{font-size:13px;color:var(--ink-2);line-height:1.35;}
+.hint b{color:var(--ink);}
+
+.acts{display:flex;gap:8px;}
+.btn{
+  min-height:var(--tap);padding:0 16px;border-radius:var(--r);
+  border:1.5px solid var(--line-2);background:var(--bg);
+  font-size:15px;font-weight:600;display:inline-flex;align-items:center;
+  justify-content:center;gap:8px;flex:1;
+}
+.btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none;}
+.btn.p{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);min-height:var(--tap-lg);font-size:16px;}
+.btn.danger{background:var(--rec);border-color:var(--rec);color:#fff;min-height:var(--tap-lg);font-size:16px;}
+.btn.flexnone{flex:none;padding:0 14px;}
+.btn:disabled{opacity:.4;}
+.chips{display:flex;gap:6px;}
+.chip{
+  min-height:40px;padding:0 12px;border-radius:999px;border:1px solid var(--line);
+  background:var(--bg-2);font-size:13px;font-weight:600;flex:1;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+}
+
+.recdot{width:11px;height:11px;border-radius:50%;background:var(--rec);flex:none;animation:pulse 1.4s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.recdot{animation:none}}
+
+/* ---------------- hojas ---------------- */
+.sheet{
+  position:absolute;z-index:20;left:0;right:0;bottom:0;top:auto;
+  max-height:92%;display:none;flex-direction:column;
+  background:var(--bg);border-radius:16px 16px 0 0;box-shadow:var(--sheet-shadow);
+}
+.sheet.open{display:flex;}
+.sheet .hd{
+  flex:none;padding:8px 14px 10px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:10px;
+}
+.handle{
+  position:absolute;top:6px;left:50%;transform:translateX(-50%);
+  width:40px;height:4px;border-radius:2px;background:var(--line-2);
+}
+.sheet h2{margin:8px 0 0;font-size:17px;font-weight:700;flex:1;}
+.xbtn{
+  width:var(--tap);height:var(--tap);border-radius:50%;background:var(--bg-2);
+  display:grid;place-items:center;font-size:22px;line-height:1;flex:none;margin-top:6px;
+}
+.sheet .bd{
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:12px 14px;
+}
+.sheet .ft{
+  flex:none;padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 12px);
+  border-top:1px solid var(--line);display:flex;gap:8px;background:var(--bg);
+}
+
+/* ---------------- formulario ---------------- */
+details{border:1px solid var(--line);border-radius:var(--r);margin-bottom:10px;overflow:hidden;}
+summary{
+  list-style:none;min-height:var(--tap);display:flex;align-items:center;gap:9px;
+  padding:0 12px;background:var(--bg-2);font-weight:700;font-size:15px;
+}
+summary::-webkit-details-marker{display:none;}
+summary::after{content:"⌄";margin-left:auto;font-size:19px;color:var(--ink-3);transition:transform .15s;}
+details[open] summary::after{transform:rotate(180deg);}
+.gid{
+  width:24px;height:24px;border-radius:6px;background:var(--accent-soft);color:var(--accent);
+  display:grid;place-items:center;font-size:12px;font-weight:800;flex:none;
+}
+.grp{padding:12px;display:grid;gap:12px;}
+
+label.f{display:grid;gap:5px;font-size:12px;font-weight:700;color:var(--ink-2);}
+label.f > span{letter-spacing:.03em;text-transform:uppercase;font-size:11px;}
+input[type=text],input[type=number],select,textarea{
+  font:inherit;font-size:16px;              /* 16px evita el zoom automático en iOS */
+  color:var(--ink);background:var(--bg-2);
+  border:1.5px solid var(--line-2);border-radius:8px;
+  padding:0 10px;height:var(--tap);width:100%;
+}
+textarea{height:auto;min-height:76px;padding:10px;resize:vertical;}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--ink-3) 50%),linear-gradient(135deg,var(--ink-3) 50%,transparent 50%);
+  background-position:calc(100% - 17px) 22px,calc(100% - 12px) 22px;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:34px;}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* contadores de ganado con +/- */
+.cat{display:grid;gap:8px;}
+.catrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;}
+.catrow .nm{font-size:14px;font-weight:600;line-height:1.25;}
+.catrow .nm small{display:block;font-weight:500;font-size:11px;color:var(--ink-3);}
+.step{display:grid;grid-template-columns:var(--tap) 58px var(--tap);gap:0;flex:none;}
+.step button{
+  height:var(--tap);border:1.5px solid var(--line-2);background:var(--bg-2);
+  font-size:23px;font-weight:700;display:grid;place-items:center;
+}
+.step button:first-child{border-radius:8px 0 0 8px;}
+.step button:last-child{border-radius:0 8px 8px 0;}
+.step input{
+  height:var(--tap);border-radius:0;border-left:0;border-right:0;text-align:center;
+  font-weight:700;font-variant-numeric:tabular-nums;padding:0;
+}
+.step input.hot{background:var(--accent-soft);border-color:var(--accent);}
+
+.calc{background:var(--bg-3);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;gap:8px;}
+.kv{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:14px;}
+.kv .v{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
+.fine{font-size:11px;color:var(--ink-3);line-height:1.45;}
+.st{display:inline-flex;gap:5px;align-items:center;font-size:13px;font-weight:700;padding:4px 9px;border-radius:7px;}
+.st.ok{background:var(--ok-soft);color:var(--ok);} .st.warn{background:var(--warn-soft);color:var(--warn);}
+.st.crit{background:var(--crit-soft);color:var(--crit);} .st.none{background:var(--bg-3);color:var(--ink-3);}
+.note{border-left:4px solid var(--accent);background:var(--bg-2);padding:10px 12px;font-size:13px;color:var(--ink-2);border-radius:0 8px 8px 0;margin-bottom:12px;}
+.note b{color:var(--ink);}
+
+.pc{border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:10px;}
+.pc .nm{font-weight:700;font-size:16px;}
+.pc .mt{font-size:13px;color:var(--ink-2);margin-top:2px;}
+.pc .nums{display:flex;gap:14px;margin-top:6px;font-size:14px;font-variant-numeric:tabular-nums;}
+.pc .nums b{font-weight:700;}
+.pc .acts{display:flex;gap:8px;margin-top:10px;}
+.pc .acts .btn{min-height:42px;font-size:14px;}
+.empty{text-align:center;color:var(--ink-2);padding:28px 12px;font-size:14px;}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:6px;}
+
+.toast{
+  position:absolute;z-index:40;left:50%;transform:translateX(-50%) translateY(14px);
+  bottom:calc(var(--dock-h) + 16px);
+  background:var(--ink);color:#fff;padding:11px 16px;border-radius:10px;
+  font-size:14px;font-weight:600;max-width:88%;text-align:center;
+  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* controles de MapLibre por encima del dock */
+.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{bottom:calc(var(--dock-h) + 4px)!important;}
+.maplibregl-ctrl-attrib{font-size:10px;}
+.maplibregl-ctrl-top-right{top:calc(env(safe-area-inset-top,0px) + 56px)!important;}
+
+/* ---------------- tablet y horizontal ---------------- */
+@media (min-width:640px){
+  .dock{left:auto;right:10px;bottom:10px;width:360px;border:1px solid var(--line);border-radius:14px;}
+  .fabs{right:382px;bottom:14px;}
+  .sheet{left:auto;right:10px;width:400px;max-height:calc(100% - 20px);border-radius:14px;bottom:10px;}
+  .maplibregl-ctrl-bottom-left{bottom:14px!important;}
+  .maplibregl-ctrl-bottom-right{bottom:14px!important;right:382px!important;}
+  .metric .v{font-size:24px;}
+}
+@media (min-width:1024px){
+  .dock{width:400px;}
+  .fabs{right:422px;}
+  .sheet{width:440px;}
+  .maplibregl-ctrl-bottom-right{right:422px!important;}
+  .r2{grid-template-columns:1fr 1fr;}
+}
+/* horizontal en celular: pantalla muy baja */
+@media (orientation:landscape) and (max-height:520px){
+  .dock{width:330px;padding:8px;gap:7px;}
+  .metric .v{font-size:19px;}
+  .hint{display:none;}
+  .btn{font-size:14px;white-space:nowrap;padding:0 10px;}
+  .btn.p,.btn.danger{font-size:15px;}
+  .fabs{right:352px;}
+  .maplibregl-ctrl-bottom-right{right:352px!important;}
+  .sheet{width:360px;}
+}
 </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<div class="bar">
-  <div class="brand"><span>GEO</span>NUGKA<em>Aja</em></div>
-  <div class="grow"></div>
-  <select id="layer" title="Capa base">
-    <option value="esri">Esri World Imagery</option>
-    <option value="s2">Sentinel-2 cloudless (EOX)</option>
-    <option value="osm">OpenStreetMap</option>
-  </select>
-  <span class="gps" id="netchip" title="Estado de conexión">en línea</span>
-  <span class="gps" id="gpschip">GPS apagado</span>
-  <button id="b-install" hidden style="padding:.25rem .5rem;font-size:.75rem">Instalar</button>
+<div class="status">
+  <span class="brand">GEONUGKA<i> · Aja</i></span>
+  <span class="grow"></span>
+  <span class="pill off" id="netchip" hidden><span class="dot"></span>sin conexión</span>
+  <span class="pill gps-off" id="gpschip"><span class="dot"></span>GPS</span>
+  <label class="pill sel" title="Capa base">
+    <select id="layer" aria-label="Capa base">
+      <option value="esri">Esri</option>
+      <option value="s2">Sentinel-2</option>
+      <option value="osm">OSM</option>
+    </select>
+  </label>
 </div>
 
-<div class="dock">
-  <div class="live">
-    <div><span class="k">Superficie</span><span class="v" id="l-area">—</span></div>
-    <div><span class="k">Perímetro</span><span class="v" id="l-per">—</span></div>
-    <div><span class="k">Vértices</span><span class="v" id="l-ver">—</span></div>
-    <div class="msg" id="l-msg">Activa <b>Dibujar</b> y toca el mapa, o usa <b>Caminar GPS</b> para recorrer el lindero.</div>
-  </div>
-  <div class="btns">
-    <button id="b-draw" aria-pressed="false">Dibujar</button>
-    <button id="b-gps" aria-pressed="false">Caminar GPS</button>
-    <button id="b-mark">Marcar vértice</button>
-    <button id="b-undo">Deshacer</button>
-    <button id="b-close" class="p" disabled>Cerrar y registrar</button>
-    <button id="b-list">Potreros (<span id="n">0</span>)</button>
-    <button id="b-exp">Exportar</button>
-  </div>
+<div class="fabs">
+  <button class="fab" id="b-install" hidden title="Instalar la app">
+    <svg viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M4 19h16"/></svg>
+  </button>
+  <button class="fab" id="b-sol" aria-pressed="false" title="Alto contraste para el sol">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+  </button>
+  <button class="fab" id="b-here" title="Centrar en mi ubicación">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.4"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg>
+  </button>
 </div>
 
-<!-- Formulario -->
+<div class="dock" id="dock">
+  <div class="metrics" id="metrics" hidden>
+    <div class="metric" id="m-area"><span class="k">Superficie</span><span class="v">—</span></div>
+    <div class="metric" id="m-per"><span class="k">Perímetro</span><span class="v">—</span></div>
+    <div class="metric" id="m-ver"><span class="k">Vértices</span><span class="v">—</span></div>
+  </div>
+  <div class="hint" id="hint">Toca <b>Caminar GPS</b> para recorrer el lindero, o <b>Dibujar</b> para trazarlo sobre la imagen.</div>
+  <div class="acts" id="acts"></div>
+  <div class="chips" id="chips"></div>
+</div>
+
+<!-- hoja: formulario -->
 <div class="sheet" id="sheet">
-  <h2 id="sh-title">Registrar potrero</h2>
-  <div class="calc" id="sh-geo"></div>
-
-  <div class="grp">
-    <div class="r2">
-      <label class="f"><span>Predio</span><input id="f-predio" placeholder="Fundo…"></label>
-      <label class="f"><span>Potrero</span><input id="f-nombre" placeholder="El alto"></label>
-    </div>
-    <label class="f"><span>Productor</span><input id="f-productor"></label>
-    <label class="f"><span>Distrito</span><select id="f-distrito"></select></label>
-    <div class="r2">
-      <label class="f"><span>Superficie útil (ha)</span><input type="number" step="0.01" id="f-util"></label>
-      <label class="f"><span>Estado</span><select id="f-estado">
-        <option>En uso</option><option>En descanso</option><option>En renovación</option><option>Clausurado</option>
-      </select></label>
-    </div>
+  <div class="hd"><span class="handle"></span>
+    <h2 id="sh-title">Registrar potrero</h2>
+    <button class="xbtn" id="sh-close" aria-label="Cerrar">×</button>
   </div>
+  <div class="bd">
+    <div class="calc" id="sh-geo" style="margin-bottom:12px"></div>
 
-  <div class="grp">
-    <label class="f"><span>Tipo de pastura</span><select id="f-tipo">
-      <option>Natural</option><option>Natural mejorada</option><option>Cultivada</option>
-      <option>Asociada gramínea + leguminosa</option><option>Silvopastoril</option><option>Cultivo de corte</option>
-    </select></label>
-    <label class="f"><span>Especie principal</span><select id="f-especie"></select></label>
-    <label class="f"><span>Leguminosa asociada</span><select id="f-legum"></select></label>
-    <div class="r3">
-      <label class="f"><span>Cobertura %</span><input type="number" id="f-cob" value="85"></label>
-      <label class="f"><span>kg MS/ha</span><input type="number" id="f-ms" value="2800"></label>
-      <label class="f"><span>Días ocup.</span><input type="number" id="f-ocup" value="4"></label>
-    </div>
+    <details open>
+      <summary><span class="gid">A</span> Predio</summary>
+      <div class="grp">
+        <label class="f"><span>Nombre del potrero</span><input id="f-nombre" placeholder="El alto"></label>
+        <label class="f"><span>Predio</span><input id="f-predio" placeholder="Fundo…"></label>
+        <label class="f"><span>Productor</span><input id="f-productor"></label>
+        <label class="f"><span>Distrito</span><select id="f-distrito"></select></label>
+        <div class="r2">
+          <label class="f"><span>Sup. útil (ha)</span><input type="number" step="0.01" inputmode="decimal" id="f-util"></label>
+          <label class="f"><span>Estado</span><select id="f-estado">
+            <option>En uso</option><option>En descanso</option><option>En renovación</option><option>Clausurado</option>
+          </select></label>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="gid">C</span> Pastura</summary>
+      <div class="grp">
+        <label class="f"><span>Tipo</span><select id="f-tipo">
+          <option>Natural</option><option>Natural mejorada</option><option>Cultivada</option>
+          <option>Asociada gramínea + leguminosa</option><option>Silvopastoril</option><option>Cultivo de corte</option>
+        </select></label>
+        <label class="f"><span>Especie principal</span><select id="f-especie"></select></label>
+        <label class="f"><span>Leguminosa asociada</span><select id="f-legum"></select></label>
+        <div class="r2">
+          <label class="f"><span>Cobertura %</span><input type="number" inputmode="numeric" id="f-cob" value="85"></label>
+          <label class="f"><span>kg MS/ha</span><input type="number" inputmode="numeric" id="f-ms" value="2800"></label>
+        </div>
+        <label class="f"><span>Días de ocupación</span><input type="number" inputmode="numeric" id="f-ocup" value="4"></label>
+      </div>
+    </details>
+
+    <details>
+      <summary><span class="gid">D</span> Ganado</summary>
+      <div class="grp">
+        <div class="r2">
+          <label class="f"><span>Especie</span><select id="f-espani">
+            <option value="bovino">Bovino</option><option value="ovino">Ovino</option>
+            <option value="caprino">Caprino</option><option value="equino">Equino</option>
+          </select></label>
+          <label class="f"><span>Raza</span><select id="f-raza"></select></label>
+        </div>
+        <div class="cat" id="cat"></div>
+      </div>
+    </details>
+
+    <div class="calc" id="sh-calc"></div>
+
+    <details style="margin-top:10px">
+      <summary><span class="gid">G</span> Observaciones</summary>
+      <div class="grp">
+        <label class="f"><span>Notas de campo</span><textarea id="f-obs" placeholder="Pisoteo cerca del bebedero…"></textarea></label>
+      </div>
+    </details>
   </div>
-
-  <div class="grp">
-    <div class="r2">
-      <label class="f"><span>Especie animal</span><select id="f-espani">
-        <option value="bovino">Bovino</option><option value="ovino">Ovino</option>
-        <option value="caprino">Caprino</option><option value="equino">Equino</option>
-      </select></label>
-      <label class="f"><span>Raza</span><select id="f-raza"></select></label>
-    </div>
-    <div class="cat" id="cat"></div>
-  </div>
-
-  <div class="calc" id="sh-calc"></div>
-  <label class="f" style="margin-bottom:.7rem"><span>Observaciones</span><textarea id="f-obs" rows="2"></textarea></label>
-
-  <div class="btns">
-    <button class="p" id="b-save" style="flex:1">Guardar</button>
-    <button id="b-cancel">Cancelar</button>
+  <div class="ft">
+    <button class="btn p" id="b-save">Guardar potrero</button>
+    <button class="btn flexnone" id="b-cancel">Cancelar</button>
   </div>
 </div>
 
-<!-- Lista -->
+<!-- hoja: lista -->
 <div class="sheet" id="listsheet">
-  <h2>Potreros registrados</h2>
-  <div class="note">Se guardan en este navegador (almacenamiento local). Exporta a GeoJSON o KML para llevarlos a QGIS, ArcGIS o Google Earth.</div>
-  <div id="plist"></div>
-  <div class="btns" style="margin-top:.6rem">
-    <button id="b-geojson">Descargar GeoJSON</button>
-    <button id="b-kml">Descargar KML</button>
-    <button id="b-closelist" class="p">Cerrar</button>
+  <div class="hd"><span class="handle"></span>
+    <h2>Potreros registrados</h2>
+    <button class="xbtn" id="ls-close" aria-label="Cerrar">×</button>
+  </div>
+  <div class="bd">
+    <div class="note">Se guardan en este celular. <b>Exporta después de cada salida:</b> mientras no exista el servidor de sincronización, esa copia es la única.</div>
+    <div id="plist"></div>
+  </div>
+  <div class="ft">
+    <button class="btn" id="b-geojson">GeoJSON</button>
+    <button class="btn" id="b-kml">KML</button>
   </div>
 </div>
+
+<div class="toast" id="toast"></div>
 
 <script>
 /* ===================================================================
-   GEONUGKA | Aja — versión de campo
-   IGBI – FIZBAC – UNTRM · prototipo, software libre
-   Capas base abiertas / gratuitas para uso académico.
+   GEONUGKA | Aja — versión de campo · IGBI – FIZBAC – UNTRM
+   Interfaz para celular y tablet. Software libre (GPL-3.0).
    =================================================================== */
 (function(){
 "use strict";
+const $ = id => document.getElementById(id);
 
-/* ---------- la librería del mapa tiene que estar ---------- */
 if(!window.maplibregl){
-  document.getElementById('map').innerHTML =
-    '<div style="padding:5rem 1.5rem 1.5rem;text-align:center;font-size:.9rem;line-height:1.6">'+
-    '<b style="display:block;font-size:1rem;margin-bottom:.4rem">No se pudo cargar la librería del mapa</b>'+
-    'La primera vez que abres la app necesita internet para descargarla. '+
-    'Conéctate y vuelve a cargar esta página; después ya funcionará sin señal.</div>';
-  document.querySelector('.dock').style.display='none';
+  $('map').innerHTML='<div style="padding:30vh 24px 0;text-align:center;color:#fff;font-size:15px;line-height:1.6">'+
+    '<b style="display:block;font-size:17px;margin-bottom:8px">No se pudo cargar el mapa</b>'+
+    'La primera vez la app necesita internet para descargar la librería. Conéctate y vuelve a abrirla.</div>';
+  $('dock').style.display='none'; document.querySelector('.fabs').style.display='none';
   return;
 }
 
@@ -235,9 +465,9 @@ const CATS=[{k:'vacaProd',n:'Vaca en producción',ua:1.00},{k:'vacaSeca',n:'Vaca
  {k:'ternero',n:'Ternero / ternera',ua:0.30},{k:'toro',n:'Toro',ua:1.25},{k:'torete',n:'Torete',ua:0.80}];
 const CONSUMO_UA=13.5, UTILIZACION=0.55;
 
-/* ---------- geodesia (idéntica a Turf.js) ---------- */
+/* ---------- geodesia (fórmula de Turf.js) ---------- */
 const R=6371008.8, rad=d=>d*Math.PI/180;
-function areaM2(ring){ // ring: [[lon,lat],...]
+function areaM2(ring){
   if(ring.length<3) return 0;
   let t=0;
   for(let i=0;i<ring.length;i++){
@@ -267,7 +497,7 @@ function utm(lon,lat){
   const E=k0*N*(A+(1-T+C)*A**3/6)+500000;
   let Nn=k0*(M+N*Math.tan(f)*(A*A/2+(5-T+9*C+4*C*C)*A**4/24));
   if(lat<0) Nn+=1e7;
-  return zone+(lat<0?'S':'N')+' · '+Math.round(E)+' E · '+Math.round(Nn)+' N';
+  return zone+(lat<0?'S':'N')+' · '+Math.round(E)+'E · '+Math.round(Nn)+'N';
 }
 const fmt=(v,d=1)=>Number(v).toLocaleString('es-PE',{minimumFractionDigits:d,maximumFractionDigits:d});
 
@@ -280,145 +510,258 @@ const SOURCES={
   osm:{tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
        attr:'© OpenStreetMap contributors (ODbL)'}
 };
-function styleFor(k){
-  return {version:8, sources:{base:{type:'raster',tiles:SOURCES[k].tiles,tileSize:256,attribution:SOURCES[k].attr}},
-          layers:[{id:'base',type:'raster',source:'base'}]};
-}
-const map = new maplibregl.Map({
+const styleFor = k => ({version:8,
+  sources:{base:{type:'raster',tiles:SOURCES[k].tiles,tileSize:256,attribution:SOURCES[k].attr}},
+  layers:[{id:'base',type:'raster',source:'base'}]});
+
+const map=new maplibregl.Map({
   container:'map', style:styleFor('esri'),
-  center:[-77.6540,-6.2790], zoom:15, maxZoom:20, attributionControl:{compact:true}
+  center:[-77.6540,-6.2790], zoom:15, maxZoom:20,
+  attributionControl:{compact:true}, dragRotate:false, pitchWithRotate:false
 });
-map.addControl(new maplibregl.NavigationControl({showCompass:true}),'top-right');
-map.addControl(new maplibregl.ScaleControl({maxWidth:110,unit:'metric'}),'bottom-left');
+map.touchZoomRotate.disableRotation();
+map.addControl(new maplibregl.ScaleControl({maxWidth:96,unit:'metric'}),'bottom-left');
+if(window.innerWidth>=900) map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
 
 const EMPTY={type:'FeatureCollection',features:[]};
-map.on('load',()=>{
+function addLayers(){
+  if(map.getSource('saved')) return;
   map.addSource('saved',{type:'geojson',data:EMPTY});
-  map.addLayer({id:'saved-f',type:'fill',source:'saved',paint:{'fill-color':'#FFD600','fill-opacity':0.16}});
-  map.addLayer({id:'saved-l',type:'line',source:'saved',paint:{'line-color':'#FFD600','line-width':2}});
-  map.addLayer({id:'saved-t',type:'symbol',source:'saved',
-    layout:{'text-field':['concat',['get','nombre'],' · ',['to-string',['round',['*',['get','superficie_ha'],100]]]],
-            'text-size':11,'text-offset':[0,0]},
-    paint:{'text-color':'#fff','text-halo-color':'#14201A','text-halo-width':1.6}});
-
+  map.addLayer({id:'saved-f',type:'fill',source:'saved',paint:{'fill-color':'#FFD600','fill-opacity':0.18}});
+  map.addLayer({id:'saved-l',type:'line',source:'saved',paint:{'line-color':'#FFD600','line-width':2.5}});
   map.addSource('draft',{type:'geojson',data:EMPTY});
-  map.addLayer({id:'draft-f',type:'fill',source:'draft',filter:['==','$type','Polygon'],
-    paint:{'fill-color':'#00E5FF','fill-opacity':0.18}});
-  map.addLayer({id:'draft-l',type:'line',source:'draft',
-    paint:{'line-color':'#00E5FF','line-width':2.4,'line-dasharray':[2,1]}});
+  map.addLayer({id:'draft-f',type:'fill',source:'draft',filter:['==','$type','Polygon'],paint:{'fill-color':'#00E5FF','fill-opacity':0.2}});
+  map.addLayer({id:'draft-l',type:'line',source:'draft',paint:{'line-color':'#00E5FF','line-width':3}});
   map.addLayer({id:'draft-p',type:'circle',source:'draft',filter:['==','$type','Point'],
-    paint:{'circle-radius':4.5,'circle-color':'#00E5FF','circle-stroke-color':'#fff','circle-stroke-width':1.6}});
-  refreshSaved();
-});
-document.getElementById('layer').onchange=e=>{
-  const k=e.target.value;
-  map.setStyle(styleFor(k));
-  map.once('styledata',()=>{ setTimeout(()=>{ if(!map.getSource('saved')) location.reload(); },50); });
-  map.once('idle',()=>{ if(!map.getSource('saved')){ map.fire('load'); } });
-};
-// recrear capas al cambiar de estilo
-map.on('styledata',()=>{
-  if(map.isStyleLoaded() && !map.getSource('saved')){
-    map.addSource('saved',{type:'geojson',data:EMPTY});
-    map.addLayer({id:'saved-f',type:'fill',source:'saved',paint:{'fill-color':'#FFD600','fill-opacity':0.16}});
-    map.addLayer({id:'saved-l',type:'line',source:'saved',paint:{'line-color':'#FFD600','line-width':2}});
-    map.addSource('draft',{type:'geojson',data:EMPTY});
-    map.addLayer({id:'draft-f',type:'fill',source:'draft',filter:['==','$type','Polygon'],paint:{'fill-color':'#00E5FF','fill-opacity':0.18}});
-    map.addLayer({id:'draft-l',type:'line',source:'draft',paint:{'line-color':'#00E5FF','line-width':2.4}});
-    map.addLayer({id:'draft-p',type:'circle',source:'draft',filter:['==','$type','Point'],
-      paint:{'circle-radius':4.5,'circle-color':'#00E5FF','circle-stroke-color':'#fff','circle-stroke-width':1.6}});
-    refreshSaved(); refreshDraft();
-  }
-});
+    paint:{'circle-radius':5,'circle-color':'#00E5FF','circle-stroke-color':'#fff','circle-stroke-width':2}});
+  map.addSource('me',{type:'geojson',data:EMPTY});
+  map.addLayer({id:'me-acc',type:'circle',source:'me',
+    paint:{'circle-radius':['get','px'],'circle-color':'#2F7BFF','circle-opacity':0.18,
+           'circle-stroke-color':'#2F7BFF','circle-stroke-opacity':0.5,'circle-stroke-width':1}});
+  map.addLayer({id:'me-dot',type:'circle',source:'me',
+    paint:{'circle-radius':7,'circle-color':'#2F7BFF','circle-stroke-color':'#fff','circle-stroke-width':2.5}});
+  refreshSaved(); refreshDraft(); refreshMe();
+}
+map.on('load',addLayers);
+map.on('styledata',()=>{ if(map.isStyleLoaded()) addLayers(); });
+$('layer').onchange=e=>map.setStyle(styleFor(e.target.value));
 
 /* ---------- estado ---------- */
-const $=id=>document.getElementById(id);
-let draft=[], drawing=false, watching=null, lastPos=null, acc=null, metodo='', editId=null;
+let mode='idle';                 // idle | draw | walk | measure
+let draft=[], measure=[], metodo='';
+let watching=null, lastPos=null, acc=null, wake=null, editId=null, walkDist=0;
 let potreros=[];
-try{ potreros=JSON.parse(localStorage.getItem('geonugka_potreros')||'[]'); }catch(e){ potreros=[]; }
-const save=()=>{ try{ localStorage.setItem('geonugka_potreros',JSON.stringify(potreros)); }catch(e){} };
+try{ potreros=JSON.parse(localStorage.getItem('geonugka_potreros')||'[]'); }catch(e){}
+const persist=()=>{ try{ localStorage.setItem('geonugka_potreros',JSON.stringify(potreros)); }catch(e){} };
 
+/* ---------- dock según el estado ---------- */
+const ICO={
+  walk:'<svg viewBox="0 0 24 24"><circle cx="13" cy="4" r="2"/><path d="M11 22l2-6-3-3 1-5 4 2 2 3"/><path d="M11 13l-3 4"/></svg>',
+  draw:'<svg viewBox="0 0 24 24"><path d="M5 7l7-3 7 4-2 9-8 2-4-5z"/></svg>',
+  undo:'<svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-4"/></svg>',
+  check:'<svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg>',
+  pin:'<svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/></svg>',
+  stop:'<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'
+};
+function renderDock(){
+  const acts=$('acts'), chips=$('chips'), n=potreros.length;
+  const showM = (mode==='draw'||mode==='walk') || draft.length>0 || mode==='measure';
+  $('metrics').hidden = !showM;
+  $('m-area').classList.toggle('rec', mode==='walk');
+
+  if(mode==='walk'){
+    acts.innerHTML =
+      '<button class="btn flexnone" id="a-mark">'+ICO.pin+'Vértice</button>'+
+      '<button class="btn danger" id="a-stop">'+ICO.stop+'Detener y cerrar</button>';
+    chips.innerHTML='';
+    $('hint').innerHTML='<span class="recdot" style="display:inline-block;vertical-align:middle"></span> <b>Grabando.</b> Un punto cada 3 m · '+fmt(walkDist,0)+' m recorridos · la pantalla no se apagará.';
+    $('a-mark').onclick=markVertex;
+    $('a-stop').onclick=()=>{ stopGPS(); if(draft.length>=3) openForm(); else toast('Faltan vértices para cerrar'); };
+  } else if(mode==='draw'){
+    acts.innerHTML =
+      '<button class="btn flexnone" id="a-undo">'+ICO.undo+'</button>'+
+      '<button class="btn p" id="a-close" '+(draft.length<3?'disabled':'')+'>'+ICO.check+'Cerrar y registrar</button>';
+    chips.innerHTML='<button class="chip" id="a-cancel">Descartar</button>';
+    $('hint').innerHTML='Toca el mapa en cada esquina del lindero.';
+    $('a-undo').onclick=()=>{ draft.pop(); refreshDraft(); renderDock(); };
+    $('a-close').onclick=()=>openForm();
+    $('a-cancel').onclick=reset;
+  } else if(mode==='measure'){
+    acts.innerHTML='<button class="btn p" id="a-endm">Terminar medición</button>';
+    chips.innerHTML='';
+    $('hint').innerHTML='Toca dos o más puntos para medir la distancia entre ellos.';
+    $('a-endm').onclick=()=>{ measure=[]; setMode('idle'); refreshDraft(); };
+  } else {
+    acts.innerHTML =
+      '<button class="btn p" id="a-walk">'+ICO.walk+'Caminar GPS</button>'+
+      '<button class="btn" id="a-draw">'+ICO.draw+'Dibujar</button>';
+    chips.innerHTML =
+      '<button class="chip" id="a-list">Potreros ('+n+')</button>'+
+      '<button class="chip" id="a-meas">Medir</button>';
+    $('hint').innerHTML='Toca <b>Caminar GPS</b> para recorrer el lindero, o <b>Dibujar</b> para trazarlo sobre la imagen.';
+    $('a-walk').onclick=startWalk;
+    $('a-draw').onclick=()=>{ setMode('draw'); };
+    $('a-list').onclick=openList;
+    $('a-meas').onclick=()=>{ measure=[]; setMode('measure'); };
+  }
+  syncDockHeight();
+}
+function setMode(m){ mode=m; map.getCanvas().style.cursor = (m==='draw'||m==='measure')?'crosshair':''; renderDock(); }
+function syncDockHeight(){
+  requestAnimationFrame(()=>{
+    document.documentElement.style.setProperty('--dock-h', $('dock').offsetHeight+'px');
+  });
+}
+new ResizeObserver(syncDockHeight).observe($('dock'));
+addEventListener('orientationchange', syncDockHeight);
+
+/* ---------- capas de datos ---------- */
 function refreshDraft(){
   const feats=[];
-  if(draft.length>2) feats.push({type:'Feature',geometry:{type:'Polygon',coordinates:[draft.concat([draft[0]])]},properties:{}});
-  else if(draft.length>1) feats.push({type:'Feature',geometry:{type:'LineString',coordinates:draft},properties:{}});
-  draft.forEach(c=>feats.push({type:'Feature',geometry:{type:'Point',coordinates:c},properties:{}}));
+  const pts = mode==='measure'? measure : draft;
+  if(mode!=='measure'){
+    if(draft.length>2) feats.push({type:'Feature',geometry:{type:'Polygon',coordinates:[draft.concat([draft[0]])]},properties:{}});
+    else if(draft.length>1) feats.push({type:'Feature',geometry:{type:'LineString',coordinates:draft},properties:{}});
+  } else if(measure.length>1){
+    feats.push({type:'Feature',geometry:{type:'LineString',coordinates:measure},properties:{}});
+  }
+  pts.forEach(c=>feats.push({type:'Feature',geometry:{type:'Point',coordinates:c},properties:{}}));
   const s=map.getSource('draft'); if(s) s.setData({type:'FeatureCollection',features:feats});
-  const a=draft.length>2?areaM2(draft):0, p=perim(draft,draft.length>2);
-  $('l-area').textContent = a? fmt(a/10000,2)+' ha':'—';
-  $('l-per').textContent = p? fmt(p,0)+' m':'—';
-  $('l-ver').textContent = draft.length||'—';
-  $('b-close').disabled = draft.length<3;
-  if(draft.length>=3 && acc!=null)
-    $('l-msg').innerHTML='Incertidumbre estimada <b>±'+fmt(p*acc/2/10000,2)+' ha</b> con ±'+fmt(acc,1)+' m de GPS.';
+  updateMetrics();
+}
+function updateMetrics(){
+  if(mode==='measure'){
+    const d=perim(measure,false);
+    setM('m-area','Distancia', measure.length>1? fmt(d,1):'—','m');
+    setM('m-per','Tramos', Math.max(0,measure.length-1),'');
+    setM('m-ver','Puntos', measure.length,'');
+    return;
+  }
+  const closed=draft.length>2;
+  const a=closed?areaM2(draft):0, p=perim(draft,closed);
+  setM('m-area','Superficie', a? fmt(a/10000,2):'—','ha');
+  setM('m-per','Perímetro', p? fmt(p,0):'—','m');
+  setM('m-ver', acc!=null?'Precisión':'Vértices', acc!=null? fmt(acc,1): (draft.length||'—'), acc!=null?'m':'');
+}
+function setM(id,k,v,u){
+  const el=$(id);
+  el.querySelector('.k').textContent=k;
+  el.querySelector('.v').innerHTML = v + (u&&v!=='—'?' <small>'+u+'</small>':'');
 }
 function refreshSaved(){
   const s=map.getSource('saved'); if(!s) return;
   s.setData({type:'FeatureCollection',features:potreros.map(toFeature)});
-  $('n').textContent=potreros.length;
 }
+function refreshMe(){
+  const s=map.getSource('me'); if(!s) return;
+  if(!lastPos){ s.setData(EMPTY); return; }
+  const px = acc!=null ? Math.min(90, Math.max(10, acc/metersPerPixel())) : 12;
+  s.setData({type:'FeatureCollection',features:[{type:'Feature',
+    geometry:{type:'Point',coordinates:lastPos},properties:{px:px}}]});
+}
+function metersPerPixel(){
+  const lat=map.getCenter().lat;
+  return 156543.03392*Math.cos(lat*Math.PI/180)/Math.pow(2, map.getZoom());
+}
+map.on('zoom',refreshMe);
 
-/* ---------- dibujar ---------- */
-$('b-draw').onclick=()=>{
-  drawing=!drawing;
-  $('b-draw').setAttribute('aria-pressed',String(drawing));
-  map.getCanvas().style.cursor = drawing?'crosshair':'';
-  $('l-msg').textContent = drawing?'Toca el mapa para colocar cada vértice del lindero.':'';
-};
+/* ---------- toques en el mapa ---------- */
 map.on('click',e=>{
-  if(!drawing) return;
-  draft.push([+e.lngLat.lng.toFixed(7), +e.lngLat.lat.toFixed(7)]);
-  metodo='Digitalización sobre imagen';
-  refreshDraft();
+  const c=[+e.lngLat.lng.toFixed(7), +e.lngLat.lat.toFixed(7)];
+  if(mode==='draw'){ draft.push(c); metodo='Digitalización sobre imagen'; buzz(18); refreshDraft(); renderDock(); }
+  else if(mode==='measure'){ measure.push(c); buzz(12); refreshDraft(); renderDock(); }
 });
-$('b-undo').onclick=()=>{ draft.pop(); refreshDraft(); };
 
 /* ---------- GPS ---------- */
-$('b-gps').onclick=()=>{
-  if(watching!=null){ stopGPS(); return; }
-  if(!navigator.geolocation){ alert('Este navegador no expone la ubicación.'); return; }
-  $('gpschip').textContent='buscando señal…';
-  watching = navigator.geolocation.watchPosition(pos=>{
-    lastPos=[+pos.coords.longitude.toFixed(7), +pos.coords.latitude.toFixed(7)];
-    acc = pos.coords.accuracy;
-    $('gpschip').textContent='GPS ±'+fmt(acc,1)+' m';
-    $('gpschip').classList.add('live');
-    if(!map.__centered){ map.jumpTo({center:lastPos,zoom:18}); map.__centered=true; }
-    if(autoTrack && acc<=accLimit){
+function gpsClass(a){ return a==null?'gps-off': a<=5?'gps-ok': a<=12?'gps-mid':'gps-bad'; }
+function setGpsChip(txt,cls){
+  const c=$('gpschip'); c.className='pill '+cls;
+  c.innerHTML='<span class="dot"></span>'+txt;
+}
+const ACC_LIMIT=15, MIN_STEP=3;
+function startWalk(){
+  if(!navigator.geolocation){ toast('Este navegador no entrega la ubicación'); return; }
+  draft=[]; walkDist=0; metodo='Caminata perimetral con GNSS';
+  setGpsChip('buscando…','gps-off');
+  setMode('walk'); refreshDraft(); keepAwake(true);
+  watching=navigator.geolocation.watchPosition(pos=>{
+    const p=[+pos.coords.longitude.toFixed(7), +pos.coords.latitude.toFixed(7)];
+    acc=pos.coords.accuracy; lastPos=p;
+    setGpsChip('±'+fmt(acc,1)+' m', gpsClass(acc));
+    refreshMe();
+    if(!map.__centered){ map.jumpTo({center:p,zoom:18}); map.__centered=true; }
+    else if(mode==='walk') map.easeTo({center:p,duration:600});
+    if(mode==='walk' && acc<=ACC_LIMIT){
       const last=draft[draft.length-1];
-      if(!last || dist(last,lastPos)>=3){ draft.push(lastPos); metodo='Caminata perimetral con GNSS'; refreshDraft(); }
+      const d=last? dist(last,p):Infinity;
+      if(d>=MIN_STEP){
+        if(last) walkDist+=d;
+        draft.push(p); buzz(20); refreshDraft(); renderDock();
+      }
     }
   }, err=>{
-    $('gpschip').textContent='GPS no disponible';
-    alert('No se pudo leer la ubicación ('+err.message+').\n\nEn Chrome la geolocalización suele exigir HTTPS: sirve este archivo con "python3 -m http.server" y ábrelo por http://localhost:8000, o publícalo en un servidor con certificado.');
+    setGpsChip('sin GPS','gps-bad');
+    toast('No se pudo leer la ubicación');
+    setTimeout(()=>alert('El navegador no entregó la ubicación ('+err.message+').\n\nRevisa que el permiso esté en "Permitir mientras se usa la app" y que la ubicación precisa esté activada.'),300);
     stopGPS();
-  }, {enableHighAccuracy:true, maximumAge:1000, timeout:20000});
-  autoTrack=true;
-  $('b-gps').setAttribute('aria-pressed','true');
-  $('l-msg').innerHTML='<b>Caminando el perímetro.</b> Se guarda un punto cada 3 m descartando lecturas peores que ±'+accLimit+' m.';
-};
-let autoTrack=false; const accLimit=15;
+  }, {enableHighAccuracy:true, maximumAge:1000, timeout:25000});
+}
+function markVertex(){
+  if(!lastPos){ toast('Todavía sin señal GPS'); return; }
+  const last=draft[draft.length-1];
+  if(last) walkDist+=dist(last,lastPos);
+  draft.push(lastPos.slice()); buzz([25,40,25]); refreshDraft(); renderDock();
+  toast('Vértice marcado');
+}
 function stopGPS(){
   if(watching!=null) navigator.geolocation.clearWatch(watching);
-  watching=null; autoTrack=false;
-  $('b-gps').setAttribute('aria-pressed','false');
-  $('gpschip').classList.remove('live');
-  $('gpschip').textContent='GPS apagado';
+  watching=null; keepAwake(false);
+  setGpsChip(acc!=null?'±'+fmt(acc,1)+' m':'GPS', acc!=null?gpsClass(acc):'gps-off');
+  if(mode==='walk') setMode('idle');
 }
-$('b-mark').onclick=()=>{
-  if(!lastPos){ alert('Activa primero el GPS para marcar un vértice en tu posición.'); return; }
-  draft.push(lastPos.slice()); metodo=metodo||'Vértices con GNSS'; refreshDraft();
+$('b-here').onclick=()=>{
+  if(lastPos){ map.easeTo({center:lastPos,zoom:Math.max(map.getZoom(),17)}); return; }
+  if(!navigator.geolocation){ toast('Sin acceso a la ubicación'); return; }
+  toast('Buscando tu ubicación…');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    lastPos=[pos.coords.longitude,pos.coords.latitude]; acc=pos.coords.accuracy;
+    setGpsChip('±'+fmt(acc,1)+' m',gpsClass(acc)); refreshMe();
+    map.easeTo({center:lastPos,zoom:17});
+  }, ()=>toast('No se pudo obtener la ubicación'), {enableHighAccuracy:true,timeout:15000});
 };
 
+/* pantalla encendida mientras se camina */
+async function keepAwake(on){
+  try{
+    if(on && 'wakeLock' in navigator){ wake=await navigator.wakeLock.request('screen'); }
+    else if(wake){ await wake.release(); wake=null; }
+  }catch(e){ wake=null; }
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && mode==='walk') keepAwake(true);
+});
+function buzz(p){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} }
+
 /* ---------- formulario ---------- */
-(function init(){
+(function initForm(){
   const d=$('f-distrito'); DISTRITOS.forEach((x,i)=>d.add(new Option(x.n,i)));
   d.onchange=()=>{ fillEsp(); fillRaza(); calc(); };
   LEGUM.forEach(x=>$('f-legum').add(new Option(x,x)));
-  $('cat').innerHTML = CATS.map(c=>'<label for="c-'+c.k+'">'+c.n+' <small style="color:var(--ink-3)">'+c.ua.toFixed(2)+' UA</small></label>'+
-    '<input type="number" min="0" id="c-'+c.k+'" value="0">').join('');
-  $('cat').addEventListener('input',calc);
-  $('f-espani').onchange=()=>{ fillRaza(); };
+  $('cat').innerHTML = CATS.map(c=>
+    '<div class="catrow"><div class="nm">'+c.n+'<small>'+c.ua.toFixed(2)+' UA cada uno</small></div>'+
+    '<div class="step"><button type="button" data-d="'+c.k+'" aria-label="Menos">−</button>'+
+    '<input type="number" inputmode="numeric" min="0" id="c-'+c.k+'" value="0">'+
+    '<button type="button" data-i="'+c.k+'" aria-label="Más">+</button></div></div>').join('');
+  $('cat').addEventListener('click',e=>{
+    const inc=e.target.dataset && e.target.dataset.i, dec=e.target.dataset && e.target.dataset.d;
+    if(!inc && !dec) return;
+    const el=$('c-'+(inc||dec));
+    let v=(parseInt(el.value,10)||0) + (inc?1:-1);
+    el.value=Math.max(0,v); el.classList.toggle('hot', el.value>0);
+    buzz(12); calc();
+  });
+  $('cat').addEventListener('input',e=>{ if(e.target.id) e.target.classList.toggle('hot',(parseInt(e.target.value,10)||0)>0); calc(); });
+  $('f-espani').onchange=()=>fillRaza();
   ['f-ms','f-util','f-ocup'].forEach(id=>$(id).addEventListener('input',calc));
   fillEsp(); fillRaza();
 })();
@@ -431,48 +774,59 @@ function balance(ua,dias,ocup){
   if(dias<ocup*1.3) return {c:'warn',i:'▲',t:'Ajustado'};
   return {c:'ok',i:'✓',t:'Adecuado'};
 }
+const kv=(k,v)=>'<div class="kv"><span>'+k+'</span><span class="v">'+v+'</span></div>';
 function calc(){
   let ua=0; CATS.forEach(c=>ua+=(parseFloat($('c-'+c.k).value)||0)*c.ua);
   const util=parseFloat($('f-util').value)||0, ms=parseFloat($('f-ms').value)||0, ocup=parseFloat($('f-ocup').value)||1;
   const carga=util>0?ua/util:0, oferta=ms*util*UTILIZACION, dias=ua>0?oferta/(ua*CONSUMO_UA):Infinity;
   const b=balance(ua,dias,ocup);
   $('sh-calc').innerHTML =
-    kv('Unidades animal',fmt(ua,1)+' UA')+kv('Carga animal',util>0?fmt(carga,2)+' UA/ha':'—')+
-    kv('Oferta forrajera',fmt(oferta,0)+' kg MS')+kv('Días de pastoreo',ua>0?fmt(dias,1)+' días':'—')+
+    kv('Unidades animal',fmt(ua,1)+' UA')+
+    kv('Carga animal',util>0?fmt(carga,2)+' UA/ha':'—')+
+    kv('Oferta forrajera',fmt(oferta,0)+' kg MS')+
+    kv('Días de pastoreo',ua>0?fmt(dias,1)+' días':'—')+
     '<div class="kv"><span>Balance</span><span class="st '+b.c+'">'+b.i+' '+b.t+'</span></div>'+
-    '<div style="font-family:ui-monospace,monospace;font-size:.64rem;color:var(--ink-3);line-height:1.4">1 UA = bovino de 450 kg · consumo 13,5 kg MS/día · utilización 55 %</div>';
+    '<div class="fine">1 UA = bovino de 450 kg · consumo 13,5 kg MS/día · utilización 55 %. Valores referenciales, pendientes de validación por el IGBI.</div>';
   return {ua,carga,oferta,dias,b};
 }
-const kv=(k,v)=>'<div class="kv"><span>'+k+'</span><span class="v">'+v+'</span></div>';
 
-$('b-close').onclick=()=>{
-  if(draft.length<3) return;
-  drawing=false; $('b-draw').setAttribute('aria-pressed','false'); map.getCanvas().style.cursor='';
+function openForm(){
+  if(draft.length<3){ toast('Se necesitan al menos 3 vértices'); return; }
   stopGPS();
   const a=areaM2(draft)/10000, p=perim(draft,true), c=cen(draft);
+  $('sh-title').textContent = editId? 'Editar potrero' : 'Registrar potrero';
   $('sh-geo').innerHTML =
-    kv('Superficie geodésica', fmt(a,3)+' ha'+(acc?' <small style="font-weight:400">± '+fmt(p*acc/2/10000,2)+'</small>':''))+
-    kv('Perímetro', fmt(p,1)+' m')+ kv('Vértices', draft.length)+
-    '<div class="kv"><span>Centroide</span><span class="v" style="font-family:ui-monospace,monospace;font-size:.72rem">'+c[1].toFixed(5)+', '+c[0].toFixed(5)+'</span></div>'+
-    '<div class="kv"><span>UTM</span><span class="v" style="font-family:ui-monospace,monospace;font-size:.72rem">'+utm(c[0],c[1])+'</span></div>'+
-    '<div style="font-family:ui-monospace,monospace;font-size:.64rem;color:var(--ink-3);line-height:1.4">Área sobre el elipsoide WGS84, no proyectada. Método: '+(metodo||'manual')+'</div>';
+    kv('Superficie', '<span style="font-size:19px">'+fmt(a,3)+' ha</span>'+(acc?' <small style="font-weight:500;color:var(--ink-2)">± '+fmt(p*acc/2/10000,2)+'</small>':''))+
+    kv('Perímetro', fmt(p,1)+' m')+
+    kv('Vértices', draft.length)+
+    kv('UTM', '<span style="font-size:12px;font-family:ui-monospace,monospace">'+utm(c[0],c[1])+'</span>')+
+    '<div class="fine">Área geodésica sobre el elipsoide WGS84, no proyectada. Método: '+(metodo||'manual')+'.</div>';
   $('f-util').value=(a*0.95).toFixed(2);
   calc();
-  $('sheet').classList.add('open');
-};
-$('b-cancel').onclick=()=>{ $('sheet').classList.remove('open'); };
+  openSheet('sheet');
+}
+function openSheet(id){ document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open')); $(id).classList.add('open'); }
+function closeSheets(){ document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open')); }
+$('sh-close').onclick=()=>closeSheets();
+$('b-cancel').onclick=()=>{ closeSheets(); };
+$('ls-close').onclick=()=>closeSheets();
+
+function reset(){
+  draft=[]; measure=[]; acc=null; metodo=''; editId=null; walkDist=0;
+  refreshDraft(); setMode('idle');
+}
 
 $('b-save').onclick=()=>{
   const a=areaM2(draft)/10000, p=perim(draft,true), m=calc();
   const cats={}; CATS.forEach(c=>cats[c.k]=parseFloat($('c-'+c.k).value)||0);
-  const dist_=DISTRITOS[$('f-distrito').value];
+  const dis=DISTRITOS[$('f-distrito').value];
   const rec={
     id: editId || ('P-'+String(potreros.length+1).padStart(2,'0')),
     nombre:$('f-nombre').value.trim()||('Potrero '+(potreros.length+1)),
     ring:draft.slice(), superficie_ha:+a.toFixed(4), perimetro_m:+p.toFixed(1),
     precision_m: acc!=null?+acc.toFixed(2):null, metodo:metodo||'manual',
     predio:$('f-predio').value.trim(), productor:$('f-productor').value.trim(),
-    distrito:dist_.n, piso:dist_.piso, estado:$('f-estado').value,
+    distrito:dis.n, piso:dis.piso, estado:$('f-estado').value,
     superficie_util_ha:parseFloat($('f-util').value)||a,
     tipo_pastura:$('f-tipo').value, especie:$('f-especie').value, leguminosa:$('f-legum').value,
     cobertura_pct:+$('f-cob').value, ms_kg_ha:+$('f-ms').value, dias_ocupacion:+$('f-ocup').value,
@@ -481,38 +835,57 @@ $('b-save').onclick=()=>{
     dias_pastoreo: isFinite(m.dias)?+m.dias.toFixed(1):null, balance:m.b.t,
     observaciones:$('f-obs').value.trim(), fecha:new Date().toISOString()
   };
-  if(editId){ potreros[potreros.findIndex(x=>x.id===editId)]=rec; editId=null; }
+  if(editId){ potreros[potreros.findIndex(x=>x.id===editId)]=rec; }
   else potreros.push(rec);
-  save(); refreshSaved();
-  draft=[]; acc=null; metodo=''; refreshDraft();
-  $('sheet').classList.remove('open');
+  persist(); refreshSaved();
+  closeSheets(); reset();
   ['f-nombre','f-obs'].forEach(id=>$(id).value='');
-  CATS.forEach(c=>$('c-'+c.k).value=0);
-  $('l-msg').textContent='Guardado: '+rec.nombre+' · '+fmt(rec.superficie_ha,2)+' ha';
+  CATS.forEach(c=>{ $('c-'+c.k).value=0; $('c-'+c.k).classList.remove('hot'); });
+  buzz([30,60,30]);
+  toast(rec.nombre+' guardado · '+fmt(rec.superficie_ha,2)+' ha');
 };
 
 /* ---------- lista y exportación ---------- */
-$('b-list').onclick=()=>{ renderList(); $('listsheet').classList.add('open'); };
-$('b-closelist').onclick=()=>$('listsheet').classList.remove('open');
-$('b-exp').onclick=()=>{ renderList(); $('listsheet').classList.add('open'); };
+function openList(){ renderList(); openSheet('listsheet'); }
 function renderList(){
   $('plist').innerHTML = potreros.length? potreros.map(p=>
-    '<div class="pc"><div class="nm">'+p.id+' · '+esc(p.nombre)+'</div>'+
-    '<div class="mt">'+fmt(p.superficie_ha,2)+' ha · '+fmt(p.perimetro_m,0)+' m · '+fmt(p.carga_animal_ua_ha,2)+' UA/ha · '+esc(p.balance)+'</div>'+
-    '<div class="mt">'+esc(p.especie)+' · '+esc(p.raza)+'</div>'+
-    '<div class="btns" style="margin-top:.35rem"><button data-z="'+p.id+'">Ver</button><button data-x="'+p.id+'">Eliminar</button></div></div>'
-  ).join('') : '<div class="mt" style="color:var(--ink-2)">Todavía no hay potreros registrados.</div>';
-  $('plist').querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{
-    const p=potreros.find(x=>x.id===b.dataset.z);
-    const bb=p.ring.reduce((a,c)=>[[Math.min(a[0][0],c[0]),Math.min(a[0][1],c[1])],[Math.max(a[1][0],c[0]),Math.max(a[1][1],c[1])]],
-      [[180,90],[-180,-90]]);
-    map.fitBounds(bb,{padding:60}); $('listsheet').classList.remove('open');
-  });
+    '<div class="pc"><div class="nm">'+esc(p.nombre)+'</div>'+
+    '<div class="mt">'+esc(p.distrito)+' · '+esc(p.especie.split(' (')[0])+' · '+esc(p.raza)+'</div>'+
+    '<div class="nums"><span><b>'+fmt(p.superficie_ha,2)+'</b> ha</span>'+
+    '<span><b>'+fmt(p.perimetro_m,0)+'</b> m</span>'+
+    '<span><b>'+fmt(p.carga_animal_ua_ha,2)+'</b> UA/ha</span></div>'+
+    '<div class="acts"><button class="btn" data-z="'+p.id+'">Ver</button>'+
+    '<button class="btn" data-e="'+p.id+'">Editar</button>'+
+    '<button class="btn" data-x="'+p.id+'">Borrar</button></div></div>'
+  ).join('') : '<div class="empty"><b>Todavía no hay potreros</b>Camina el perímetro de uno o dibújalo sobre la imagen.</div>';
+  $('plist').querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{ zoomTo(b.dataset.z); closeSheets(); });
+  $('plist').querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>editPotrero(b.dataset.e));
   $('plist').querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{
-    if(!confirm('¿Eliminar este potrero? No se puede deshacer.')) return;
-    potreros=potreros.filter(x=>x.id!==b.dataset.x); save(); refreshSaved(); renderList();
+    if(!confirm('¿Borrar este potrero? No se puede deshacer.')) return;
+    potreros=potreros.filter(x=>x.id!==b.dataset.x); persist(); refreshSaved(); renderList(); renderDock();
   });
 }
+function zoomTo(id){
+  const p=potreros.find(x=>x.id===id); if(!p) return;
+  const bb=p.ring.reduce((a,c)=>[[Math.min(a[0][0],c[0]),Math.min(a[0][1],c[1])],[Math.max(a[1][0],c[0]),Math.max(a[1][1],c[1])]],
+    [[180,90],[-180,-90]]);
+  map.fitBounds(bb,{padding:60});
+}
+function editPotrero(id){
+  const p=potreros.find(x=>x.id===id); if(!p) return;
+  editId=id; draft=p.ring.slice(); metodo=p.metodo; acc=p.precision_m;
+  const di=DISTRITOS.findIndex(d=>d.n===p.distrito); if(di>=0){ $('f-distrito').value=di; $('f-distrito').onchange(); }
+  $('f-nombre').value=p.nombre; $('f-predio').value=p.predio; $('f-productor').value=p.productor;
+  $('f-estado').value=p.estado; $('f-tipo').value=p.tipo_pastura;
+  sel('f-especie',p.especie); sel('f-legum',p.leguminosa);
+  $('f-cob').value=p.cobertura_pct; $('f-ms').value=p.ms_kg_ha; $('f-ocup').value=p.dias_ocupacion;
+  $('f-espani').value=p.especie_animal; fillRaza(); sel('f-raza',p.raza);
+  $('f-obs').value=p.observaciones||'';
+  CATS.forEach(c=>{ const v=p.cabezas[c.k]||0; $('c-'+c.k).value=v; $('c-'+c.k).classList.toggle('hot',v>0); });
+  refreshDraft(); zoomTo(id); openForm();
+  $('f-util').value=(p.superficie_util_ha||p.superficie_ha).toFixed(2); calc();
+}
+function sel(id,val){ const s=$(id), o=[...s.options].find(o=>o.textContent===val); if(o) s.value=o.value; }
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function toFeature(p){
@@ -520,19 +893,22 @@ function toFeature(p){
   const {ring:_,...props}=p;
   return {type:'Feature',geometry:{type:'Polygon',coordinates:[ring]},properties:props};
 }
-function download(name, text, mime){
+function download(name,text,mime){
   const b=new Blob([text],{type:mime||'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(b); a.download=name; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),4000);
 }
 $('b-geojson').onclick=()=>{
+  if(!potreros.length){ toast('No hay nada que exportar'); return; }
   download('geonugka_potreros.geojson', JSON.stringify({
     type:'FeatureCollection', name:'GEONUGKA_Aja_potreros',
     crs:{type:'name',properties:{name:'urn:ogc:def:crs:OGC:1.3:CRS84'}},
     features:potreros.map(toFeature)},null,2));
+  toast('GeoJSON descargado');
 };
 $('b-kml').onclick=()=>{
+  if(!potreros.length){ toast('No hay nada que exportar'); return; }
   const k='<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>GEONUGKA Aja</name>'+
     '<Style id="s"><LineStyle><color>ff00d6ff</color><width>2</width></LineStyle>'+
     '<PolyStyle><color>2600d6ff</color></PolyStyle></Style>'+
@@ -542,47 +918,59 @@ $('b-kml').onclick=()=>{
       p.ring.concat([p.ring[0]]).map(c=>c[0]+','+c[1]+',0').join(' ')+
       '</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>').join('')+
     '</Document></kml>';
-  download('geonugka_potreros.kml', k, 'application/vnd.google-earth.kml+xml');
+  download('geonugka_potreros.kml',k,'application/vnd.google-earth.kml+xml');
+  toast('KML descargado');
 };
 
-refreshDraft();
+/* ---------- alto contraste ---------- */
+(function(){
+  let on=false;
+  try{ on = localStorage.getItem('geonugka_sol')==='1'; }catch(e){}
+  apply(on);
+  $('b-sol').onclick=()=>{ on=!on; apply(on); try{ localStorage.setItem('geonugka_sol',on?'1':'0'); }catch(e){} };
+  function apply(v){
+    document.documentElement.setAttribute('data-sol', v?'1':'0');
+    $('b-sol').setAttribute('aria-pressed',String(v));
+  }
+})();
+
+/* ---------- avisos ---------- */
+let tt=null;
+function toast(msg){
+  const el=$('toast'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('show'),2600);
+}
+
+renderDock(); refreshDraft();
 })();
 </script>
 
 <script>
-/* Instalación, conexión y service worker: bloque aparte a propósito, para que
-   un fallo del mapa no impida que la app se instale ni que cachee sus archivos. */
+/* Instalación, conexión y service worker: bloque aparte, para que un fallo
+   del mapa no impida instalar la app ni cachear sus archivos. */
 (function(){
-  const g = id => document.getElementById(id);
-  function net(){
-    const c = g('netchip'); if(!c) return;
-    if(navigator.onLine){ c.textContent='en línea'; c.classList.remove('live'); }
-    else { c.textContent='sin conexión'; c.classList.add('live'); }
-  }
-  window.addEventListener('online', net);
-  window.addEventListener('offline', net);
-  net();
+  const g=id=>document.getElementById(id);
+  function net(){ g('netchip').hidden = navigator.onLine; }
+  addEventListener('online',net); addEventListener('offline',net); net();
 
-  let deferred = null;
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault(); deferred = e; g('b-install').hidden = false;
-  });
-  g('b-install').onclick = async () => {
+  let deferred=null;
+  addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferred=e; g('b-install').hidden=false; });
+  g('b-install').onclick=async()=>{
     if(!deferred){
       alert('Para instalarla:\n\nAndroid (Chrome): menú de tres puntos → "Añadir a pantalla de inicio".\n\niPhone (Safari): botón Compartir → "Añadir a pantalla de inicio".');
       return;
     }
-    deferred.prompt(); await deferred.userChoice; deferred = null; g('b-install').hidden = true;
+    deferred.prompt(); await deferred.userChoice; deferred=null; g('b-install').hidden=true;
   };
-  window.addEventListener('appinstalled', () => { g('b-install').hidden = true; });
+  addEventListener('appinstalled',()=>{ g('b-install').hidden=true; });
 
-  if('serviceWorker' in navigator && location.protocol !== 'file:'){
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js')
-        .catch(err => console.warn('Service worker no registrado:', err));
+  if('serviceWorker' in navigator && location.protocol!=='file:'){
+    addEventListener('load',()=>{
+      navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW no registrado:',e));
     });
   }
 })();
 </script>
 </body>
 </html>
+
