@@ -10,7 +10,7 @@
      Para trabajar sin señal en una zona nueva hace falta un paquete PMTiles
      generado desde fuentes abiertas, que es lo previsto en la propuesta.
 */
-const VER = 'geonugka-v1';
+const VER = 'geonugka-v2';
 const SHELL = VER + '-shell';
 const TILES = VER + '-tiles';
 const TILES_MAX = 1200;
